@@ -13,26 +13,38 @@ import Test.QuickCheck
 data Stream = Stream [Char]
               deriving (Eq, Show)
 
--- FP1.1
--- The parser can receive a “stream” (see Stream) of Chars and 
--- result in some type a. This implies that a parser is of 
--- type Parser a, where a is the type of the parse result.
+{-  FP1.1
 
--- FP1.2
--- The parser has an appropriate Functor instance.
+    The parser can receive a “stream” (see Stream) of Chars and 
+    result in some type a. This implies that a parser is of 
+    type Parser a, where a is the type of the parse result.
+-}
 
--- FP1.3
--- The function char :: Char -> Parser Char parses a single 
--- (given) Char.
+{-  FP1.2
 
--- FP1.4
--- The function failure :: Parser a is a parser that consumes 
--- no input and fails (produces no valid parsing result).
+    The parser has an appropriate Functor instance.
+-}
 
--- FP1.5
--- The parser has an Applicative instance for the sequence 
--- combinator.
+{-  FP1.3
 
--- FP1.6
--- The parser has an Alternative instance that tries as few 
--- alternatives as possible (i.e., until the first parser succeeds).
+    The function char :: Char -> Parser Char parses a single 
+    (given) Char.
+-}
+
+{-  FP1.4
+
+    The function failure :: Parser a is a parser that consumes 
+    no input and fails (produces no valid parsing result).
+-}
+
+{-  FP1.5
+
+    The parser has an Applicative instance for the sequence 
+    combinator.
+-}
+
+{-  FP1.6
+
+    The parser has an Alternative instance that tries as few 
+    alternatives as possible (i.e., until the first parser succeeds).
+-}
