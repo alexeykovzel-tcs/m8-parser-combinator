@@ -1,7 +1,6 @@
--- Add your names and student numbers to the following lines. Do not change anything else on these lines, since they are parsed.
 -- Student 1: Aliaksei Kouzel (s2648563)
--- Student 2: Second student (syyyyyyy)
--- Student 3: Third student (szzzzzzz)
+-- Student 2: Denis Krylov (s2808757)
+-- Student 3: Serkan Akin (s2727218)
 
 module BasicParsers where
 
