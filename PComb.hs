@@ -8,43 +8,48 @@ import Control.Applicative
 import Data.Char
 import Test.QuickCheck
 
--- Stream of Chars - can be extended with the 
--- location for error handling
+-- Stream of Chars
 data Stream = Stream [Char]
               deriving (Eq, Show)
 
-{-  FP1.1
+-- FP1.1
+data Parser a = P {
+    parse :: String -> [(a, String)]
+}
 
-    The parser can receive a “stream” (see Stream) of Chars and 
-    result in some type a. This implies that a parser is of 
-    type Parser a, where a is the type of the parse result.
--}
+-- FP1.2
+instance Functor Parser where
+    fmap f p = 
+        P (\xs -> [
+            (f a, ys) | 
+            (a, ys) <- parse p xs 
+        ])
 
-{-  FP1.2
+-- FP1.3
+char :: Char -> Parser Char
+char c = P parse
+    where parse xs   
+            | length xs == 0 = []
+            | head xs == c = [(c,tail xs)]
+            | otherwise = []
 
-    The parser has an appropriate Functor instance.
--}
+-- FP1.4
+failure :: Parser a
+failure = P (\_ -> [])
 
-{-  FP1.3
+-- FP1.5
+instance Applicative Parser where
+    pure a = P (\xs -> [(a, xs)])
+    p1 <*> p2 = 
+        P (\xs -> [
+            (a b, zs) | 
+            (a, ys) <- parse p1 xs,
+            (b, zs) <- parse p2 ys 
+        ])
 
-    The function char :: Char -> Parser Char parses a single 
-    (given) Char.
--}
-
-{-  FP1.4
-
-    The function failure :: Parser a is a parser that consumes 
-    no input and fails (produces no valid parsing result).
--}
-
-{-  FP1.5
-
-    The parser has an Applicative instance for the sequence 
-    combinator.
--}
-
-{-  FP1.6
-
-    The parser has an Alternative instance that tries as few 
-    alternatives as possible (i.e., until the first parser succeeds).
--}
+-- FP1.6
+instance Alternative Parser where
+    empty = failure
+    some p = (:) <$> p <*> many p
+    many p = some p <|> pure []
+    p1 <|> p2 = P (\xs -> parse p1 xs ++ parse p2 xs)
