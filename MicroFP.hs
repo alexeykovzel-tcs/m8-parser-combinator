@@ -13,14 +13,6 @@ import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
 
 -----------------------------------------------------------------------------
--- Testing
------------------------------------------------------------------------------
-
--- QuickCheck: all prop_* tests
-return []
-check = $quickCheckAll
-
------------------------------------------------------------------------------
 -- FP3.1
 -----------------------------------------------------------------------------
 
@@ -226,15 +218,48 @@ fromBool (BoolVal x) = x
 -- FP4.1
 -----------------------------------------------------------------------------
 
--- parseProg :: Parser Prog
+-- type Prog = [Stmt]
 
--- parseStmt :: Pasrer Stmt
+-- data Stmt
+--     = FunDecl String [Arg] Expr
+--     deriving Show
+
+-- data Arg 
+--     = FixedArg  Integer 
+--     | VarArg    String
+--     deriving Show
+
+-- data Expr
+--     = Less      Expr Expr
+--     | Eq        Expr Expr
+--     | More      Expr Expr
+--     | Add       Expr Expr
+--     | Sub       Expr Expr
+--     | Mult      Expr Expr
+--     | Fixed     Integer
+--     | Var       String
+--     | Cond      Expr Expr Expr
+--     | FunCall   String [Expr]
+--     deriving Show
+
+-- parseProg :: Parser Prog
+-- parseProg [] = []
+-- parseProg (x:xs) = parseStmt x : parseProg xs
+
+-- parseStmt :: Parser Stmt
+-- parseStmt = FunDecl
+--     <$> identifier
+--     <*> parseArgs
+--     <*> parseExpr
 
 -- parseFactor :: Parser Expr
+-- parseFactor =
 
 -- parseTerm :: Parser Expr
+-- parseTerm =
 
 -- parseExpr :: Parser Expr
+-- parseExpr =
 
 -----------------------------------------------------------------------------
 -- FP4.2
@@ -243,8 +268,8 @@ fromBool (BoolVal x) = x
 -- Parses and translates a textual representation 
 -- of µFP to EDSL (a.k.a compilation).
 
-compile :: String -> Prog
-compile code = []
+-- compile :: String -> Prog
+-- compile code = parse code
 
 -----------------------------------------------------------------------------
 -- FP4.3
@@ -264,3 +289,16 @@ compile code = []
 join :: String -> [String] -> String
 join _ [x]      = x
 join del (x:xs) = x ++ del ++ (join del xs)
+
+-----------------------------------------------------------------------------
+-- Testing
+-----------------------------------------------------------------------------
+
+prop_fibonacci = eval fibonacciProg "fibonacci" [10] == 55
+prop_fib = eval fibProg "fib" [10] == 55
+prop_sum = eval sumProg "sum" [8] == 36 
+prop_div = eval divProg "div" [15, 7] == 2
+
+-- QuickCheck: all prop_* tests
+return []
+check = $quickCheckAll

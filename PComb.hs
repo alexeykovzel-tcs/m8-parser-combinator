@@ -2,7 +2,6 @@
 -- Student 2: Denis Krylov (s2808757)
 -- Student 3: Serkan Akin (s2727218)
 
-
 module PComb where
 import Control.Applicative
 import Data.Char
