@@ -19,16 +19,16 @@ import qualified Test.QuickCheck as QC
 -- A set of type/data constructors that represent 
 -- an EDSL (deep embedding) for µFP.
 
-type Prog = [Stmt]
+type Prog = [Stmt] 
 
 data Stmt
     = FunDecl String [Arg] Expr
-    deriving Show
+    deriving (Show, Eq)
 
 data Arg 
     = FixedArg  Integer 
     | VarArg    String
-    deriving Show
+    deriving (Show, Eq)
 
 data Expr
     = Less      Expr Expr
@@ -41,7 +41,7 @@ data Expr
     | Var       String
     | Cond      Expr Expr Expr
     | FunCall   String [Expr]
-    deriving Show
+    deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
 -- FP3.2
@@ -100,12 +100,11 @@ combProg = [
 -- that corresponds to the grammar of µFP. 
 
 pretty :: Prog -> String
-pretty [] = ""
-pretty (x:xs) = prettyStmt x ++ pretty xs
+pretty xs = join " " $ prettyStmt <$> xs
 
 prettyStmt :: Stmt -> String
 prettyStmt (FunDecl id args expr)
-    = id ++ " " ++ prettyArgs ++ " := " ++ prettyExpr expr
+    = id ++ " " ++ prettyArgs ++ " := " ++ prettyExpr expr ++ ";"
     where prettyArgs = join " " (map prettyArg args)
 
 prettyArg :: Arg -> String
@@ -214,62 +213,80 @@ fromInt (IntVal x) = x
 fromBool :: Val -> Bool
 fromBool (BoolVal x) = x
 
+-- Testing
+prop_eval_0 = eval fibonacciProg "fibonacci" [10] == 55
+prop_eval_1 = eval fibProg "fib" [10] == 55
+prop_eval_2 = eval sumProg "sum" [8] == 36 
+prop_eval_3 = eval divProg "div" [15, 7] == 2
+
 -----------------------------------------------------------------------------
 -- FP4.1
 -----------------------------------------------------------------------------
 
--- type Prog = [Stmt]
+program :: Parser Prog
+program = some statement
 
--- data Stmt
---     = FunDecl String [Arg] Expr
---     deriving Show
+statement :: Parser Stmt
+statement = FunDecl
+    <$> identifier
+    <*> sep argument (char ' ')
+    <*  symbol ":=" <*> expression
+    <*  char ';'
 
--- data Arg 
---     = FixedArg  Integer 
---     | VarArg    String
---     deriving Show
+argument :: Parser Arg
+argument =  FixedArg <$> integer 
+        <|> VarArg   <$> identifier
 
--- data Expr
---     = Less      Expr Expr
---     | Eq        Expr Expr
---     | More      Expr Expr
---     | Add       Expr Expr
---     | Sub       Expr Expr
---     | Mult      Expr Expr
---     | Fixed     Integer
---     | Var       String
---     | Cond      Expr Expr Expr
---     | FunCall   String [Expr]
---     deriving Show
+expression :: Parser Expr
+expression = comparand `chain` op
+    where op = (Eq   <$ symbol "==")
+           <|> (More <$ symbol ">")
+           <|> (Less <$ symbol "<")
 
--- parseProg :: Parser Prog
--- parseProg [] = []
--- parseProg (x:xs) = parseStmt x : parseProg xs
+comparand :: Parser Expr
+comparand = term `chain` op
+    where op = (Add <$ symbol "+")
+           <|> (Sub <$ symbol "-")
 
--- parseStmt :: Parser Stmt
--- parseStmt = FunDecl
---     <$> identifier
---     <*> parseArgs
---     <*> parseExpr
+term :: Parser Expr
+term = factor `chain` op
+    where op = Mult <$ symbol "*"
 
--- parseFactor :: Parser Expr
--- parseFactor =
+factor :: Parser Expr
+factor = condition
+    <|> parens expression
+    <|> funCall
+    <|> Var   <$> identifier
+    <|> Fixed <$> integer
 
--- parseTerm :: Parser Expr
--- parseTerm =
+funCall :: Parser Expr
+funCall = FunCall
+    <$> identifier
+    <*> parens (sep expression (symbol ","))
 
--- parseExpr :: Parser Expr
--- parseExpr =
+condition :: Parser Expr
+condition = Cond
+    <$ symbol "if"   <*> parens expression
+    <* symbol "then" <*> braces expression 
+    <* symbol "else" <*> braces expression
+
+chain :: Parser a -> Parser (a -> a -> a) -> Parser a
+chain p op = ps <|> p
+  where ps = (\x f y -> f x y) <$> p <*> op <*> chain p op
 
 -----------------------------------------------------------------------------
 -- FP4.2
 -----------------------------------------------------------------------------
 
--- Parses and translates a textual representation 
--- of µFP to EDSL (a.k.a compilation).
+-- Parses a textual representation of µFP to EDSL
+compile :: String -> Prog
+compile code = fst $ head $ parse program code
 
--- compile :: String -> Prog
--- compile code = parse code
+-- Testing
+prop_compile_0 = fibonacciProg == (compile $ pretty fibonacciProg)
+prop_compile_1 = fibProg == (compile $ pretty fibProg)
+prop_compile_2 = sumProg == (compile $ pretty sumProg)
+prop_compile_3 = divProg == (compile $ pretty divProg)
 
 -----------------------------------------------------------------------------
 -- FP4.3
@@ -279,26 +296,22 @@ fromBool (BoolVal x) = x
 -- it to the µFP function. When the file contains multiple functions, 
 -- the last function in the file is used.
 
--- runFile :: FilePath -> [Integer] -> IO Integer
--- runFile path args = evalLast <$> compile <$> readFile path
+runFile :: FilePath -> [Integer] -> IO Integer
+runFile path args = evalLast args <$> compile <$> readFile path
+
+evalLast :: [Integer] -> Prog -> Integer
+evalLast args prog = eval prog name args
+    where name = (\(FunDecl name _ _) -> name) (last prog)
 
 -----------------------------------------------------------------------------
 -- Utils
 -----------------------------------------------------------------------------
 
+-- Joins strings using a separator
 join :: String -> [String] -> String
 join _ [x]      = x
-join del (x:xs) = x ++ del ++ (join del xs)
+join sep (x:xs) = x ++ sep ++ (join sep xs)
 
------------------------------------------------------------------------------
--- Testing
------------------------------------------------------------------------------
-
-prop_fibonacci = eval fibonacciProg "fibonacci" [10] == 55
-prop_fib = eval fibProg "fib" [10] == 55
-prop_sum = eval sumProg "sum" [8] == 36 
-prop_div = eval divProg "div" [15, 7] == 2
-
--- QuickCheck: all prop_* tests
+-- Run all tests
 return []
 check = $quickCheckAll
