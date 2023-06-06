@@ -9,15 +9,22 @@ import Data.Char
 import Test.QuickCheck
 
 -- Stream of Chars
-data Stream = Stream [Char]
-              deriving (Eq, Show)
+data Stream 
+    = Stream [Char]
+    deriving (Eq, Show)
 
+-----------------------------------------------------------------------------
 -- FP1.1
+-----------------------------------------------------------------------------
+
 data Parser a = P {
     parse :: String -> [(a, String)]
 }
 
+-----------------------------------------------------------------------------
 -- FP1.2
+-----------------------------------------------------------------------------
+
 instance Functor Parser where
     fmap f p = 
         P (\xs -> [
@@ -25,7 +32,11 @@ instance Functor Parser where
             (a, ys) <- parse p xs 
         ])
 
+-----------------------------------------------------------------------------
 -- FP1.3
+-----------------------------------------------------------------------------
+
+-- Parses a single character
 char :: Char -> Parser Char
 char c = P parse
     where parse xs   
@@ -33,11 +44,18 @@ char c = P parse
             | head xs == c = [(c,tail xs)]
             | otherwise = []
 
+-----------------------------------------------------------------------------
 -- FP1.4
+-----------------------------------------------------------------------------
+
+-- Always fails to parse
 failure :: Parser a
 failure = P (\_ -> [])
 
+-----------------------------------------------------------------------------
 -- FP1.5
+-----------------------------------------------------------------------------
+
 instance Applicative Parser where
     pure a = P (\xs -> [(a, xs)])
     p1 <*> p2 = 
@@ -47,7 +65,10 @@ instance Applicative Parser where
             (b, zs) <- parse p2 ys 
         ])
 
+-----------------------------------------------------------------------------
 -- FP1.6
+-----------------------------------------------------------------------------
+
 instance Alternative Parser where
     empty = failure
     some p = (:) <$> p <*> many p

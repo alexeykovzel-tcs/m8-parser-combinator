@@ -9,91 +9,258 @@ module MicroFP where
 import Control.Applicative
 import PComb
 import BasicParsers
-import Test.QuickCheck
 import Test.QuickCheck.All
+import qualified Test.QuickCheck as QC
+
+-----------------------------------------------------------------------------
+-- Testing
+-----------------------------------------------------------------------------
 
 -- QuickCheck: all prop_* tests
 return []
 check = $quickCheckAll
 
-{-  FP3.1
+-----------------------------------------------------------------------------
+-- FP3.1
+-----------------------------------------------------------------------------
 
-    A set of type/data constructors that represent an EDSL 
-    (deep embedding) for µFP, i.e., it describes the same functionality. 
-    Note, that this EDSL can be made very compact compared to the 
-    grammar. Define the type constructor Prog to indicate the type 
-    of a µFP program (top level), such that we can easily recognise 
-    your types. Do not use the constructor Function, as it might 
-    conflict with some QuickCheck versions. Be creative in your design!
--}
+-- A set of type/data constructors that represent 
+-- an EDSL (deep embedding) for µFP.
 
-{-  FP3.2
-    
-    Define the following functions in your µFP EDSL, all of type 
-    Prog (i.e., a program with one function). These must correspond 
-    to the definitions in functions.txt
+type Prog = [Stmt]
 
-    • fibonacci receives a single argument “n” (note this is a µFP 
-    argument, not a Haskell argument! The same applies below), 
-    and expresses the calculation of the n-th fibonacci number.
+data Stmt
+    = FunDecl String [Arg] Expr
+    deriving Show
 
-    • fib receives a single argument “n”, and expresses the 
-    calculation of the n-th fibonacci number.
+data Arg 
+    = FixedArg  Integer 
+    | VarArg    String
+    deriving Show
 
-    • sum receives one argument “a”, and calculates the sum from 
-    1 to a
+data Expr
+    = Less      Expr Expr
+    | Eq        Expr Expr
+    | More      Expr Expr
+    | Add       Expr Expr
+    | Sub       Expr Expr
+    | Mult      Expr Expr
+    | Fixed     Integer
+    | Var       String
+    | Cond      Expr Expr Expr
+    | FunCall   String [Expr]
+    deriving Show
 
-    • div receives two arguments “x” and “y”, and divides “x” by “y”
+-----------------------------------------------------------------------------
+-- FP3.2
+-----------------------------------------------------------------------------
 
-    • twice receives two arguments“f” (a function) and “x” (a value), 
-    and calculates f(f(x))
+-- The following functions in µFP EDSL correspond 
+-- to the definitions in functions.txt.
 
-    • A data structure that describes add, inc and eleven from 
-    functions.txt
--}
+fibonacciProg :: Prog
+fibonacciProg = [
+    FunDecl "fibonacci" [FixedArg 0] (Fixed 0),
+    FunDecl "fibonacci" [FixedArg 1] (Fixed 1),
+    FunDecl "fibonacci" [VarArg "n"] (Add addL addR) ]
+    where
+        addL = FunCall "fibonacci" [Sub (Var "n") (Fixed 1)]
+        addR = FunCall "fibonacci" [Sub (Var "n") (Fixed 2)]
 
-{-  FP3.3
-    
-    pretty :: ? -> String is a pretty printer that generates a 
-    textual representation that corresponds to the grammar of µFP. 
-    Here ? corresponds to your EDSL.
--}
+fibProg :: Prog
+fibProg = [ FunDecl "fib" [VarArg "n"] body ]
+    where
+        body = Cond cond (Fixed 1) (Add addL addR)
+        cond = Less (Var "n") (Fixed 3)
+        addL = FunCall "fib" [Sub (Var "n") (Fixed 1)]
+        addR = FunCall "fib" [Sub (Var "n") (Fixed 2)]
 
-{-  FP3.4
+sumProg :: Prog
+sumProg = [ 
+    FunDecl "sum" [FixedArg 0] (Fixed 0),
+    FunDecl "sum" [VarArg "a"] (Add recSum (Var "a")) ]
+    where 
+        recSum = FunCall "sum" [Sub (Var "a") (Fixed 1)]
 
-    eval : Prog -> String -> [Integer] -> Integer, which is a 
-    evaluator for your µFP EDSL without support for partial application, lazy 
-    evaluation, pattern matching and higher order functions. 
-    The function with the given name (of type String) in a program 
-    (of type Prog) is evaluated with the arguments of type [Integer], 
-    resulting in an Integer. Since pattern matching is not (yet) 
-    supported, you may assume constants are not used at the left-hand 
-    side (e.g., fib does not work with your evaluator yet). We will 
-    test your evaluator with some of the definitions from FP3.1 
-    (e.g., eval fib [10]). Make sure that they work with eval 
-    and that the type of eval is correct 
-    (otherwise our tests might fail).
--}
+divProg :: Prog
+divProg = [ FunDecl "div" [VarArg "x", VarArg "y"] body ]
+    where
+        body = (Cond cond (Fixed 0) (Add (Fixed 1) divcall))
+        cond = Less (Var "x") (Var "y")
+        divcall = FunCall "div" [Sub (Var "x") (Var "y"), Var "y"]
 
-{-  FP4.1
+twiceProg :: Prog
+twiceProg = [ 
+    FunDecl "twice" [VarArg "f", VarArg "x"] 
+    (FunCall "f" [FunCall "f" [Var "x"]]) ]
 
-    Define the parsers factor :: Parser ?, expr :: Parser ?, 
-    term :: Parser ? and the remaining parsers needed to parse µFP 
-    (here ? is a type from your EDSL). Make sure functions.txt is 
-    parsed properly and leads to similar definitions as in FP3.2.
--}
+combProg :: Prog
+combProg = [
+    FunDecl "add" [VarArg "x", VarArg "y"] (Add (Var "x") (Var "y")),
+    FunDecl "inc" [] (FunCall "add" [Fixed 1]),
+    FunDecl "eleven" [] (FunCall "inc" [Fixed 10]) ]
 
-{-  FP4.2
+-----------------------------------------------------------------------------
+-- FP3.3
+-----------------------------------------------------------------------------
 
-    compile :: String -> ? parses and translates a textual 
-    representation of µFP to your EDSL.
--}
+-- Pretty printer that generates a textual representation 
+-- that corresponds to the grammar of µFP. 
 
-{-  FP4.3
+pretty :: Prog -> String
+pretty [] = ""
+pretty (x:xs) = prettyStmt x ++ pretty xs
 
-    runFile :: FilePath -> [Integer] -> IO Integer results in an 
-    IO action that reads the specified file, compiles it, and 
-    finally uses eval (from FP3.4) to evaluate it with the list 
-    of integers as input to the µFP function. When the file contains
-    multiple functions, use the last function in the file.
--}
+prettyStmt :: Stmt -> String
+prettyStmt (FunDecl id args expr)
+    = id ++ " " ++ prettyArgs ++ " := " ++ prettyExpr expr
+    where prettyArgs = join " " (map prettyArg args)
+
+prettyArg :: Arg -> String
+prettyArg (FixedArg x) = show x
+prettyArg (VarArg x)   = x
+
+prettyExpr :: Expr -> String
+prettyExpr (Fixed  x) = show x
+prettyExpr (Var    x) = x
+prettyExpr (Less x y) = prettyExpr x ++ " < "  ++ prettyExpr y 
+prettyExpr (Eq   x y) = prettyExpr x ++ " == " ++ prettyExpr y 
+prettyExpr (More x y) = prettyExpr x ++ " > "  ++ prettyExpr y 
+prettyExpr (Add  x y) = prettyExpr x ++ " + "  ++ prettyExpr y 
+prettyExpr (Sub  x y) = prettyExpr x ++ " - "  ++ prettyExpr y 
+prettyExpr (Mult x y) = prettyExpr x ++ " * "  ++ prettyExpr y 
+
+prettyExpr (Cond cond x y) 
+    = "if (" ++ prettyExpr cond ++ ")"
+    ++ " then { " ++ prettyExpr x ++ " }"
+    ++ " else { " ++ prettyExpr y ++ " }"
+
+prettyExpr (FunCall id args) 
+    = id ++ " (" ++ prettyArgs ++ ")"
+    where prettyArgs = join ", " (map prettyExpr args)
+
+-----------------------------------------------------------------------------
+-- FP3.4
+-----------------------------------------------------------------------------
+
+-- Evaluator for your µFP EDSL without support for partial application, 
+-- lazy evaluation, pattern matching and higher order functions. 
+
+type LUT = [(String, Val)]
+
+data Context = C { prog :: Prog, vars :: LUT }
+
+data Val = IntVal Integer | BoolVal Bool 
+    deriving Show
+
+eval :: Prog -> String -> [Integer] -> Integer
+eval prog name intArgs = fromInt result
+    where result = evalFun prog prog name (IntVal <$> intArgs)
+
+-- Find and evaluate function value
+evalFun :: Prog -> [Stmt] -> String -> [Val] -> Val
+evalFun _ [] _ _ = error "Such function does not exist"
+evalFun prog ((FunDecl n args expr):funs) name vals
+    | n == name && argsMatch args vals = evalExpr ctx expr
+    | otherwise = evalFun prog funs name vals
+    where ctx = C prog (initLUT args vals)
+
+-- Init look-up table for variables prior to function call
+initLUT :: [Arg] -> [Val] -> LUT
+initLUT [] [] = []
+initLUT ((FixedArg _):xs) (_:ys) = initLUT xs ys
+initLUT ((VarArg x):xs) (y:ys) = (x, y) : initLUT xs ys
+
+-- Check if values match function's arguments
+argsMatch :: [Arg] -> [Val] -> Bool
+argsMatch args vals
+    | length args /= length vals = False
+    | otherwise = and $ zipWith match args vals
+    where match (FixedArg x) y = x == fromInt y
+          match (VarArg _) _ = True
+
+-- Evaluate expression value
+evalExpr :: Context -> Expr -> Val
+evalExpr _   (Fixed x) = IntVal x
+evalExpr ctx (Var   x) = findVar (vars ctx) x
+
+evalExpr ctx (Cond cond e1 e2)
+    | (\(BoolVal x) -> x) $ evalExpr ctx cond = evalExpr ctx e1
+    | otherwise = evalExpr ctx e2
+
+evalExpr ctx (FunCall name args) 
+    = evalFun p p name ((evalExpr ctx) <$> args)
+    where p = prog ctx
+
+evalExpr ctx expr = case expr of
+    (Less e1 e2) -> applyBool  (<) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Eq   e1 e2) -> applyBool (==) (evalExpr ctx e1) (evalExpr ctx e2)
+    (More e1 e2) -> applyBool  (>) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Add  e1 e2) -> applyInt   (+) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Sub  e1 e2) -> applyInt   (-) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Mult e1 e2) -> applyInt   (*) (evalExpr ctx e1) (evalExpr ctx e2)
+
+-- Binary operation on booleans
+applyBool :: (Integer -> Integer -> Bool) -> Val -> Val -> Val
+applyBool op (IntVal x) (IntVal y) = BoolVal $ op x y
+
+-- Binary operation on integers 
+applyInt :: (Integer -> Integer -> Integer) -> Val -> Val -> Val
+applyInt op (IntVal x) (IntVal y) = IntVal $ op x y
+
+-- Find a variable value by its name
+findVar :: LUT -> String -> Val
+findVar [] _ = error "Such variable does not exist"
+findVar ((x, val):xs) y
+    | x == y = val
+    | otherwise = findVar xs y
+
+-- Value extractors
+fromInt :: Val -> Integer
+fromInt (IntVal x) = x
+
+fromBool :: Val -> Bool
+fromBool (BoolVal x) = x
+
+-----------------------------------------------------------------------------
+-- FP4.1
+-----------------------------------------------------------------------------
+
+-- parseProg :: Parser Prog
+
+-- parseStmt :: Pasrer Stmt
+
+-- parseFactor :: Parser Expr
+
+-- parseTerm :: Parser Expr
+
+-- parseExpr :: Parser Expr
+
+-----------------------------------------------------------------------------
+-- FP4.2
+-----------------------------------------------------------------------------
+
+-- Parses and translates a textual representation 
+-- of µFP to EDSL (a.k.a compilation).
+
+compile :: String -> Prog
+compile code = []
+
+-----------------------------------------------------------------------------
+-- FP4.3
+-----------------------------------------------------------------------------
+
+-- Reads the specified file, compiles it, and evaluates 
+-- it to the µFP function. When the file contains multiple functions, 
+-- the last function in the file is used.
+
+-- runFile :: FilePath -> [Integer] -> IO Integer
+-- runFile path args = evalLast <$> compile <$> readFile path
+
+-----------------------------------------------------------------------------
+-- Utils
+-----------------------------------------------------------------------------
+
+join :: String -> [String] -> String
+join _ [x]      = x
+join del (x:xs) = x ++ del ++ (join del xs)
