@@ -132,15 +132,15 @@ prettyExpr (FunCall id args)
     where prettyArgs = join ", " (map prettyExpr args)
 
 -----------------------------------------------------------------------------
--- FP3.4
+-- FP3.4 ; FP5.2
 -----------------------------------------------------------------------------
 
--- Evaluator for your µFP EDSL without support for partial application, 
--- lazy evaluation, pattern matching and higher order functions. 
+-- Evaluator for your µFP EDSL without support for 
+-- partial application, lazy evaluation and higher order functions.
 
 type LUT = [(String, Val)]
 
-data Context = C { prog :: Prog, vars :: LUT }
+data Context = Ctx { prog :: Prog, vars :: LUT }
 
 data Val = IntVal Integer | BoolVal Bool 
     deriving Show
@@ -155,7 +155,7 @@ evalFun _ [] _ _ = error "Such function does not exist"
 evalFun prog ((FunDecl n args expr):funs) name vals
     | n == name && argsMatch args vals = evalExpr ctx expr
     | otherwise = evalFun prog funs name vals
-    where ctx = C prog (initLUT args vals)
+    where ctx = Ctx prog (initLUT args vals)
 
 -- Init look-up table for variables prior to function call
 initLUT :: [Arg] -> [Val] -> LUT
