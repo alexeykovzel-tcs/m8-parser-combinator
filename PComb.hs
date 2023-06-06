@@ -70,6 +70,7 @@ instance Applicative Parser where
 
 instance Alternative Parser where
     empty = failure
-    some p = (:) <$> p <*> many p
-    many p = some p <|> pure []
-    p1 <|> p2 = P (\xs -> parse p1 xs ++ parse p2 xs)
+    p1 <|> p2 = P $ \xs ->
+        case (parse p1 xs) of
+            [] -> parse p2 xs
+            r -> r

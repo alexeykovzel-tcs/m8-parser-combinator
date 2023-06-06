@@ -214,10 +214,10 @@ fromBool :: Val -> Bool
 fromBool (BoolVal x) = x
 
 -- Testing
-prop_eval_0 = eval fibonacciProg "fibonacci" [10] == 55
-prop_eval_1 = eval fibProg "fib" [10] == 55
-prop_eval_2 = eval sumProg "sum" [8] == 36 
-prop_eval_3 = eval divProg "div" [15, 7] == 2
+prop_eval_fibonacci = eval fibonacciProg "fibonacci" [10] == 55
+prop_eval_fib = eval fibProg "fib" [10] == 55
+prop_eval_sum = eval sumProg "sum" [8] == 36 
+prop_eval_div = eval divProg "div" [15, 7] == 2
 
 -----------------------------------------------------------------------------
 -- FP4.1
@@ -229,7 +229,7 @@ program = some statement
 statement :: Parser Stmt
 statement = FunDecl
     <$> identifier
-    <*> sep argument (char ' ')
+    <*> many argument
     <*  symbol ":=" <*> expression
     <*  char ';'
 
@@ -238,7 +238,7 @@ argument =  FixedArg <$> integer
         <|> VarArg   <$> identifier
 
 expression :: Parser Expr
-expression = comparand `chain` op
+expression = whitespace $ comparand `chain` op
     where op = (Eq   <$ symbol "==")
            <|> (More <$ symbol ">")
            <|> (Less <$ symbol "<")
@@ -262,7 +262,7 @@ factor = condition
 funCall :: Parser Expr
 funCall = FunCall
     <$> identifier
-    <*> parens (sep expression (symbol ","))
+    <*> (parens $ sep expression $ symbol ",")
 
 condition :: Parser Expr
 condition = Cond
@@ -271,29 +271,30 @@ condition = Cond
     <* symbol "else" <*> braces expression
 
 chain :: Parser a -> Parser (a -> a -> a) -> Parser a
-chain p op = ps <|> p
-  where ps = (\x f y -> f x y) <$> p <*> op <*> chain p op
+chain p op = wrapper <|> p
+  where wrapper = (\x f y -> f x y) <$> p <*> op <*> chain p op
 
 -----------------------------------------------------------------------------
 -- FP4.2
 -----------------------------------------------------------------------------
 
--- Parses a textual representation of µFP to EDSL
+-- Parsing a textual representation of µFP to EDSL.
+
 compile :: String -> Prog
 compile code = fst $ head $ parse program code
 
 -- Testing
-prop_compile_0 = fibonacciProg == (compile $ pretty fibonacciProg)
-prop_compile_1 = fibProg == (compile $ pretty fibProg)
-prop_compile_2 = sumProg == (compile $ pretty sumProg)
-prop_compile_3 = divProg == (compile $ pretty divProg)
+prop_compile_fibonacci = fibonacciProg == (compile $ pretty fibonacciProg)
+prop_compile_fib = fibProg == (compile $ pretty fibProg)
+prop_compile_sum = sumProg == (compile $ pretty sumProg)
+prop_compile_div = divProg == (compile $ pretty divProg)
 
 -----------------------------------------------------------------------------
 -- FP4.3
 -----------------------------------------------------------------------------
 
--- Reads the specified file, compiles it, and evaluates 
--- it to the µFP function. When the file contains multiple functions, 
+-- Reading the specified file, compile it, and evaluate it to 
+-- the µFP function. When the file contains multiple functions, 
 -- the last function in the file is used.
 
 runFile :: FilePath -> [Integer] -> IO Integer
