@@ -13,25 +13,32 @@ import PComb
 -- FP2.1
 -----------------------------------------------------------------------------
 
--- Parses one of the given chars
 oneOf :: [Char] -> Parser Char
-oneOf xs = foldl1 (\a b -> a <|> b) $ char <$> xs
+oneOf xs = charIf (\x -> elem x xs)
+
+-- Parses char given the predicate
+charIf :: (Char -> Bool) -> Parser Char
+charIf pred = P p
+    where p [] = []
+          p (x:xs)
+            | pred x = [(x, xs)]
+            | otherwise = []
 
 -- Parses a lowercase letter
 lower :: Parser Char
-lower = oneOf ['a'..'z']
+lower = charIf isLower
 
 -- Parses an uppercase letter
 upper :: Parser Char
-upper = oneOf ['A'..'Z']
+upper = charIf isUpper
 
 -- Parses a letter
 letter :: Parser Char
-letter = lower <|> upper
+letter = charIf isLetter
 
 -- Parses a digit
 dig :: Parser Char
-dig = oneOf ['0'..'9']
+dig = charIf isDigit
 
 -----------------------------------------------------------------------------
 -- FP2.2
