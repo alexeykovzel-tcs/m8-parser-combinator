@@ -31,16 +31,19 @@ data Arg
     deriving (Show, Eq)
 
 data Expr
-    = Less      Expr Expr
-    | Eq        Expr Expr
-    | More      Expr Expr
-    | Add       Expr Expr
+    = Add       Expr Expr
     | Sub       Expr Expr
     | Mult      Expr Expr
     | Fixed     Integer
     | Var       String
-    | Cond      Expr Expr Expr
+    | Cond      Pred Expr Expr
     | FunCall   String [Expr]
+    deriving (Show, Eq)
+
+type Pred = (Expr, PredOp, Expr)
+
+data PredOp
+    = Less | Eq | More
     deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
@@ -62,8 +65,8 @@ fibonacciProg = [
 fibProg :: Prog
 fibProg = [ FunDecl "fib" [VarArg "n"] body ]
     where
-        body = Cond cond (Fixed 1) (Add addL addR)
-        cond = Less (Var "n") (Fixed 3)
+        pred = (Var "n", Less, Fixed 3)
+        body = Cond pred (Fixed 1) (Add addL addR)
         addL = FunCall "fib" [Sub (Var "n") (Fixed 1)]
         addR = FunCall "fib" [Sub (Var "n") (Fixed 2)]
 
@@ -77,9 +80,9 @@ sumProg = [
 divProg :: Prog
 divProg = [ FunDecl "div" [VarArg "x", VarArg "y"] body ]
     where
-        body = (Cond cond (Fixed 0) (Add (Fixed 1) divcall))
-        cond = Less (Var "x") (Var "y")
         divcall = FunCall "div" [Sub (Var "x") (Var "y"), Var "y"]
+        pred = (Var "x", Less, Var "y")
+        body = (Cond pred (Fixed 0) (Add (Fixed 1) divcall))
 
 twiceProg :: Prog
 twiceProg = [ 
@@ -114,21 +117,27 @@ prettyArg (VarArg x)   = x
 prettyExpr :: Expr -> String
 prettyExpr (Fixed  x) = show x
 prettyExpr (Var    x) = x
-prettyExpr (Less x y) = prettyExpr x ++ " < "  ++ prettyExpr y 
-prettyExpr (Eq   x y) = prettyExpr x ++ " == " ++ prettyExpr y 
-prettyExpr (More x y) = prettyExpr x ++ " > "  ++ prettyExpr y 
 prettyExpr (Add  x y) = prettyExpr x ++ " + "  ++ prettyExpr y 
 prettyExpr (Sub  x y) = prettyExpr x ++ " - "  ++ prettyExpr y 
 prettyExpr (Mult x y) = prettyExpr x ++ " * "  ++ prettyExpr y 
 
-prettyExpr (Cond cond x y) 
-    = "if (" ++ prettyExpr cond ++ ")"
-    ++ " then { " ++ prettyExpr x ++ " }"
-    ++ " else { " ++ prettyExpr y ++ " }"
+prettyExpr (Cond pred e1 e2) 
+    = "if (" ++ prettyPred pred ++ ")"
+    ++ " then { " ++ prettyExpr e1 ++ " }"
+    ++ " else { " ++ prettyExpr e2 ++ " }"
 
 prettyExpr (FunCall id args) 
     = id ++ " (" ++ prettyArgs ++ ")"
     where prettyArgs = join ", " (map prettyExpr args)
+
+prettyPred :: Pred -> String
+prettyPred (e1, op, e2) 
+    = prettyExpr e1 ++ prettyPredOp op ++ prettyExpr e2
+
+prettyPredOp :: PredOp -> String
+prettyPredOp Less = " < "
+prettyPredOp Eq   = " == "
+prettyPredOp More = " > "
 
 -----------------------------------------------------------------------------
 -- FP3.4 ; FP5.2
@@ -141,7 +150,10 @@ type LUT = [(String, Val)]
 
 data Context = Ctx { prog :: Prog, vars :: LUT }
 
-data Val = IntVal Integer | BoolVal Bool 
+data Val
+    = IntVal    Integer 
+    | BoolVal   Bool
+    | FunVal    String [Val] -- Function with prefilled values 
     deriving Show
 
 eval :: Prog -> String -> [Integer] -> Integer
@@ -154,13 +166,13 @@ evalFun _ [] _ _ = error "Such function does not exist"
 evalFun prog ((FunDecl n args expr):funs) name vals
     | n == name && argsMatch args vals = evalExpr ctx expr
     | otherwise = evalFun prog funs name vals
-    where ctx = Ctx prog (initLUT args vals)
+    where ctx = Ctx prog (bindVars args vals)
 
 -- Init look-up table for variables prior to function call
-initLUT :: [Arg] -> [Val] -> LUT
-initLUT [] [] = []
-initLUT ((FixedArg _):xs) (_:ys) = initLUT xs ys
-initLUT ((VarArg x):xs) (y:ys) = (x, y) : initLUT xs ys
+bindVars :: [Arg] -> [Val] -> LUT
+bindVars [] [] = []
+bindVars ((FixedArg _):xs) (_:ys) = bindVars xs ys
+bindVars ((VarArg x):xs) (y:ys) = (x, y) : bindVars xs ys
 
 -- Check if values match function's arguments
 argsMatch :: [Arg] -> [Val] -> Bool
@@ -175,8 +187,8 @@ evalExpr :: Context -> Expr -> Val
 evalExpr _   (Fixed x) = IntVal x
 evalExpr ctx (Var   x) = findVar (vars ctx) x
 
-evalExpr ctx (Cond cond e1 e2)
-    | (\(BoolVal x) -> x) $ evalExpr ctx cond = evalExpr ctx e1
+evalExpr ctx (Cond pred e1 e2)
+    | evalPred ctx pred = evalExpr ctx e1
     | otherwise = evalExpr ctx e2
 
 evalExpr ctx (FunCall name args) 
@@ -184,16 +196,18 @@ evalExpr ctx (FunCall name args)
     where p = prog ctx
 
 evalExpr ctx expr = case expr of
-    (Less e1 e2) -> applyBool  (<) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Eq   e1 e2) -> applyBool (==) (evalExpr ctx e1) (evalExpr ctx e2)
-    (More e1 e2) -> applyBool  (>) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Add  e1 e2) -> applyInt   (+) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Sub  e1 e2) -> applyInt   (-) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Mult e1 e2) -> applyInt   (*) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Add  e1 e2) -> applyInt (+) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Sub  e1 e2) -> applyInt (-) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Mult e1 e2) -> applyInt (*) (evalExpr ctx e1) (evalExpr ctx e2)
+
+evalPred :: Context -> Pred -> Bool
+evalPred ctx (e1, Less, e2) = applyBool (<)  (evalExpr ctx e1) (evalExpr ctx e2)
+evalPred ctx (e1, Eq,   e2) = applyBool (==) (evalExpr ctx e1) (evalExpr ctx e2)
+evalPred ctx (e1, More, e2) = applyBool (>)  (evalExpr ctx e1) (evalExpr ctx e2)
 
 -- Binary operation on booleans
-applyBool :: (Integer -> Integer -> Bool) -> Val -> Val -> Val
-applyBool op (IntVal x) (IntVal y) = BoolVal $ op x y
+applyBool :: (Integer -> Integer -> Bool) -> Val -> Val -> Bool
+applyBool op (IntVal x) (IntVal y) = op x y
 
 -- Binary operation on integers 
 applyInt :: (Integer -> Integer -> Integer) -> Val -> Val -> Val
@@ -206,18 +220,19 @@ findVar ((x, val):xs) y
     | x == y = val
     | otherwise = findVar xs y
 
--- Value extractors
+-- Integer extractor
 fromInt :: Val -> Integer
 fromInt (IntVal x) = x
-
-fromBool :: Val -> Bool
-fromBool (BoolVal x) = x
 
 -- Testing
 prop_eval_fibonacci = eval fibonacciProg "fibonacci" [10] == 55
 prop_eval_fib = eval fibProg "fib" [10] == 55
 prop_eval_sum = eval sumProg "sum" [8] == 36 
 prop_eval_div = eval divProg "div" [15, 7] == 2
+
+-----------------------------------------------------------------------------
+-- FP5.4
+-----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
 -- FP4.1
@@ -238,13 +253,7 @@ argument =  FixedArg <$> integer
         <|> VarArg   <$> identifier
 
 expression :: Parser Expr
-expression = whitespace $ comparand `chain` op
-    where op = (Eq   <$ symbol "==")
-           <|> (More <$ symbol ">")
-           <|> (Less <$ symbol "<")
-
-comparand :: Parser Expr
-comparand = term `chain` op
+expression = whitespace $ term `chain` op
     where op = (Add <$ symbol "+")
            <|> (Sub <$ symbol "-")
 
@@ -266,9 +275,21 @@ funCall = FunCall
 
 condition :: Parser Expr
 condition = Cond
-    <$ symbol "if"   <*> parens expression
+    <$ symbol "if"   <*> parens predicate
     <* symbol "then" <*> braces expression 
     <* symbol "else" <*> braces expression
+
+predicate :: Parser Pred
+predicate = (,,)
+    <$> expression
+    <*> predicateOp
+    <*> expression
+
+predicateOp :: Parser PredOp
+predicateOp = 
+        Less <$ symbol "<"
+    <|> More <$ symbol ">"
+    <|> Less <$ symbol "=="
 
 chain :: Parser a -> Parser (a -> a -> a) -> Parser a
 chain p op = wrapper <|> p
