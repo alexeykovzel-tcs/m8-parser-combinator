@@ -26,7 +26,7 @@ data Stmt
     deriving (Show, Eq)
 
 data Arg 
-    = FixedArg  Integer 
+    = IntArg    Integer 
     | VarArg    String
     deriving (Show, Eq)
 
@@ -55,8 +55,8 @@ data PredOp
 
 fibonacciProg :: Prog
 fibonacciProg = [
-    FunDecl "fibonacci" [FixedArg 0] (Fixed 0),
-    FunDecl "fibonacci" [FixedArg 1] (Fixed 1),
+    FunDecl "fibonacci" [IntArg 0] (Fixed 0),
+    FunDecl "fibonacci" [IntArg 1] (Fixed 1),
     FunDecl "fibonacci" [VarArg "n"] (Add addL addR) ]
     where
         addL = FunCall "fibonacci" [Sub (Var "n") (Fixed 1)]
@@ -72,7 +72,7 @@ fibProg = [ FunDecl "fib" [VarArg "n"] body ]
 
 sumProg :: Prog
 sumProg = [ 
-    FunDecl "sum" [FixedArg 0] (Fixed 0),
+    FunDecl "sum" [IntArg 0] (Fixed 0),
     FunDecl "sum" [VarArg "a"] (Add recSum (Var "a")) ]
     where 
         recSum = FunCall "sum" [Sub (Var "a") (Fixed 1)]
@@ -111,7 +111,7 @@ prettyStmt (FunDecl id args expr)
     where prettyArgs = join " " (map prettyArg args)
 
 prettyArg :: Arg -> String
-prettyArg (FixedArg x) = show x
+prettyArg (IntArg x) = show x
 prettyArg (VarArg x)   = x
 
 prettyExpr :: Expr -> String
@@ -146,44 +146,21 @@ prettyPredOp More = " > "
 -- Evaluator for your µFP EDSL without support for 
 -- partial application, lazy evaluation and higher order functions.
 
-type LUT = [(String, Val)]
+type LUT = [(String, Integer)]
 
 data Context = Ctx { prog :: Prog, vars :: LUT }
 
-data Val
-    = IntVal    Integer 
-    | FunVal    String [Val] -- Function with prefilled values 
-    deriving Show
-
 eval :: Prog -> String -> [Integer] -> Integer
-eval prog name intArgs = fromInt result
-    where result = evalFun prog prog name (IntVal <$> intArgs)
+eval prog name args = evalFun prog prog name args
 
--- Find and evaluate function value
-evalFun :: Prog -> [Stmt] -> String -> [Val] -> Val
-evalFun _ [] _ _ = error "Such function does not exist"
+evalFun :: Prog -> Prog -> String -> [Integer] -> Integer
 evalFun prog ((FunDecl n args expr):funs) name vals
     | n == name && argsMatch args vals = evalExpr ctx expr
     | otherwise = evalFun prog funs name vals
     where ctx = Ctx prog (bindVars args vals)
 
--- Init look-up table for variables prior to function call
-bindVars :: [Arg] -> [Val] -> LUT
-bindVars [] [] = []
-bindVars ((FixedArg _):xs) (_:ys) = bindVars xs ys
-bindVars ((VarArg x):xs) (y:ys) = (x, y) : bindVars xs ys
-
--- Check if values match function's arguments
-argsMatch :: [Arg] -> [Val] -> Bool
-argsMatch args vals
-    | length args /= length vals = False
-    | otherwise = and $ zipWith match args vals
-    where match (FixedArg x) y = x == fromInt y
-          match (VarArg _) _ = True
-
--- Evaluate expression value
-evalExpr :: Context -> Expr -> Val
-evalExpr _   (Fixed x) = IntVal x
+evalExpr :: Context -> Expr -> Integer
+evalExpr _   (Fixed x) = x
 evalExpr ctx (Var   x) = findVar (vars ctx) x
 
 evalExpr ctx (Cond pred e1 e2)
@@ -195,43 +172,41 @@ evalExpr ctx (FunCall name args)
     where p = prog ctx
 
 evalExpr ctx expr = case expr of
-    (Add  e1 e2) -> applyInt (+) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Sub  e1 e2) -> applyInt (-) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Mult e1 e2) -> applyInt (*) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Add  e1 e2) -> evalExpr ctx e1 + evalExpr ctx e2
+    (Sub  e1 e2) -> evalExpr ctx e1 - evalExpr ctx e2
+    (Mult e1 e2) -> evalExpr ctx e1 * evalExpr ctx e2
 
 evalPred :: Context -> Pred -> Bool
-evalPred ctx (e1, Less, e2) = applyBool (<)  (evalExpr ctx e1) (evalExpr ctx e2)
-evalPred ctx (e1, Eq,   e2) = applyBool (==) (evalExpr ctx e1) (evalExpr ctx e2)
-evalPred ctx (e1, More, e2) = applyBool (>)  (evalExpr ctx e1) (evalExpr ctx e2)
+evalPred ctx (e1, Less, e2) = evalExpr ctx e1 < evalExpr ctx e2
+evalPred ctx (e1, More, e2) = evalExpr ctx e1 > evalExpr ctx e2
+evalPred ctx (e1, Eq,   e2) = evalExpr ctx e1 == evalExpr ctx e2
 
--- Binary operation on booleans
-applyBool :: (Integer -> Integer -> Bool) -> Val -> Val -> Bool
-applyBool op (IntVal x) (IntVal y) = op x y
+-- Init LUT for variables prior to function call
+bindVars :: [Arg] -> [Integer] -> LUT
+bindVars [] [] = []
+bindVars ((IntArg _):xs) (_:ys) = bindVars xs ys
+bindVars ((VarArg x):xs) (y:ys) = (x, y) : bindVars xs ys
 
--- Binary operation on integers 
-applyInt :: (Integer -> Integer -> Integer) -> Val -> Val -> Val
-applyInt op (IntVal x) (IntVal y) = IntVal $ op x y
+-- Check if values match function's arguments
+argsMatch :: [Arg] -> [Integer] -> Bool
+argsMatch args vals
+    | length args /= length vals = False
+    | otherwise = and $ zipWith match args vals
+    where match (IntArg x) y = x == y
+          match (VarArg _) _ = True
 
--- Find a variable value by its name
-findVar :: LUT -> String -> Val
+-- Find variable value in LUT by its name
+findVar :: LUT -> String -> Integer
 findVar [] _ = error "Such variable does not exist"
-findVar ((x, val):xs) y
-    | x == y = val
-    | otherwise = findVar xs y
-
--- Integer extractor
-fromInt :: Val -> Integer
-fromInt (IntVal x) = x
+findVar ((nx,x):xs) n
+    | nx /= n = findVar xs n
+    | otherwise = x
 
 -- Testing
 prop_eval_fibonacci = eval fibonacciProg "fibonacci" [10] == 55
 prop_eval_fib = eval fibProg "fib" [10] == 55
 prop_eval_sum = eval sumProg "sum" [8] == 36 
 prop_eval_div = eval divProg "div" [15, 7] == 2
-
------------------------------------------------------------------------------
--- FP5.4
------------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
 -- FP4.1
@@ -248,8 +223,8 @@ statement = FunDecl
     <*  char ';'
 
 argument :: Parser Arg
-argument =  FixedArg <$> integer 
-        <|> VarArg   <$> identifier
+argument =  IntArg <$> integer 
+        <|> VarArg <$> identifier
 
 expression :: Parser Expr
 expression = whitespace $ term `chain` op
