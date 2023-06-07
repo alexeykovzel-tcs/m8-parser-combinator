@@ -152,7 +152,6 @@ data Context = Ctx { prog :: Prog, vars :: LUT }
 
 data Val
     = IntVal    Integer 
-    | BoolVal   Bool
     | FunVal    String [Val] -- Function with prefilled values 
     deriving Show
 
