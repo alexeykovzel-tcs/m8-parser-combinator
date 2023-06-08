@@ -112,7 +112,7 @@ prettyStmt (FunDecl id args expr)
 
 prettyArg :: Arg -> String
 prettyArg (IntArg x) = show x
-prettyArg (VarArg x)   = x
+prettyArg (VarArg x) = x
 
 prettyExpr :: Expr -> String
 prettyExpr (Fixed  x) = show x
@@ -132,12 +132,11 @@ prettyExpr (FunCall id args)
 
 prettyPred :: Pred -> String
 prettyPred (e1, op, e2) 
-    = prettyExpr e1 ++ prettyPredOp op ++ prettyExpr e2
-
-prettyPredOp :: PredOp -> String
-prettyPredOp Less = " < "
-prettyPredOp Eq   = " == "
-prettyPredOp More = " > "
+    = prettyExpr e1 ++ prettyOp ++ prettyExpr e2
+    where prettyOp = case op of
+            Less -> " < "
+            More -> " > "
+            Eq -> " == "
 
 -----------------------------------------------------------------------------
 -- FP3.4 ; FP5.2
@@ -154,10 +153,10 @@ eval :: Prog -> String -> [Integer] -> Integer
 eval prog name args = evalFun prog prog name args
 
 evalFun :: Prog -> Prog -> String -> [Integer] -> Integer
-evalFun prog ((FunDecl n args expr):funs) name vals
-    | n == name && argsMatch args vals = evalExpr ctx expr
-    | otherwise = evalFun prog funs name vals
-    where ctx = Ctx prog (bindVars args vals)
+evalFun prog ((FunDecl dn args expr):funs) n vals
+    | dn == n && argsMatch args vals = evalExpr ctx expr
+    | otherwise = evalFun prog funs n vals
+    where ctx = Ctx prog $ bindVars args vals
 
 evalExpr :: Context -> Expr -> Integer
 evalExpr _   (Fixed x) = x
@@ -168,7 +167,7 @@ evalExpr ctx (Cond pred e1 e2)
     | otherwise = evalExpr ctx e2
 
 evalExpr ctx (FunCall name args) 
-    = evalFun p p name ((evalExpr ctx) <$> args)
+    = evalFun p p name (evalExpr ctx <$> args)
     where p = prog ctx
 
 evalExpr ctx expr = case expr of
@@ -266,8 +265,8 @@ predicateOp =
     <|> Less <$ symbol "=="
 
 chain :: Parser a -> Parser (a -> a -> a) -> Parser a
-chain p op = wrapper <|> p
-  where wrapper = (\x f y -> f x y) <$> p <*> op <*> chain p op
+chain p op = reorder <$> p <*> op <*> chain p op <|> p
+  where reorder x f y = f x y
 
 -----------------------------------------------------------------------------
 -- FP4.2
@@ -297,7 +296,7 @@ runFile path args = evalLast args <$> compile <$> readFile path
 
 evalLast :: [Integer] -> Prog -> Integer
 evalLast args prog = eval prog name args
-    where name = (\(FunDecl name _ _) -> name) (last prog)
+    where name = (\(FunDecl name _ _) -> name) $ last prog
 
 -----------------------------------------------------------------------------
 -- Utils

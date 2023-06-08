@@ -16,14 +16,6 @@ import PComb
 oneOf :: [Char] -> Parser Char
 oneOf xs = charIf (\x -> elem x xs)
 
--- Parses char given the predicate
-charIf :: (Char -> Bool) -> Parser Char
-charIf pred = P p
-    where p [] = []
-          p (x:xs)
-            | pred x = [(x, xs)]
-            | otherwise = []
-
 -- Parses a lowercase letter
 lower :: Parser Char
 lower = charIf isLower
@@ -83,11 +75,11 @@ identifier = whitespace $ (:) <$> lower <*> (many $ lower <|> dig)
 integer :: Parser Integer
 integer = whitespace $ read <$> some dig
 
--- parses a given String surrounded by whitespaces
+-- Parses a given String surrounded by whitespaces
 symbol :: String -> Parser String
 symbol xs = whitespace $ string xs
 
--- parses something using the provided parser between parentheses
+-- Parses something using the provided parser between parentheses
 parens :: Parser a -> Parser a 
 parens p = between (char '(') p (char ')')
 
