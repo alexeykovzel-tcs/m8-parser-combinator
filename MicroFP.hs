@@ -3,6 +3,7 @@
 -- Student 3: Serkan Akin (s2727218)
 
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module MicroFP where
 
@@ -103,45 +104,47 @@ prog_comb = [
 -- Pretty printer that generates a textual representation 
 -- that corresponds to the grammar of µFP. 
 
-pretty :: Prog -> String
-pretty = unwords . map prettyStmt
+class Pretty a where
+    pretty :: a -> String 
 
-prettyStmt :: Stmt -> String
-prettyStmt (FunDecl id args expr)
-    = unwords [id, prettyArgs, ":=", prettyExpr expr, ";"]
-    where prettyArgs = unwords $ map prettyArg args
+instance Pretty Prog where
+    pretty = unwords . map pretty
 
-prettyArg :: Arg -> String
-prettyArg (IntArg x) = show x
-prettyArg (VarArg x) = x
+instance Pretty Stmt where
+    pretty (FunDecl id args expr)
+        = unwords [id, prettyArgs, ":=", pretty expr, ";"]
+        where prettyArgs = unwords $ map pretty args
 
-prettyExpr :: Expr -> String
-prettyExpr (Fixed  x) = show x
-prettyExpr (Var    x) = x
+instance Pretty Arg where
+    pretty (IntArg x) = show x
+    pretty (VarArg x) = x
 
-prettyExpr (Add  x y) = joinExpr x " + " y 
-prettyExpr (Sub  x y) = joinExpr x " - " y 
-prettyExpr (Mult x y) = joinExpr x " * " y 
+instance Pretty Expr where
+    pretty (Fixed  x) = show x
+    pretty (Var    x) = x
+    pretty (Add  x y) = prettyJoin x " + " y 
+    pretty (Sub  x y) = prettyJoin x " - " y 
+    pretty (Mult x y) = prettyJoin x " * " y 
 
-prettyExpr (Cond pred e1 e2) 
-    = "if (" ++ prettyPred pred ++ ")"
-    ++ " then { " ++ prettyExpr e1 ++ " }"
-    ++ " else { " ++ prettyExpr e2 ++ " }"
+    pretty (Cond pred e1 e2) 
+        = "if (" ++ pretty pred ++ ")"
+        ++ " then { " ++ pretty e1 ++ " }"
+        ++ " else { " ++ pretty e2 ++ " }"
 
-prettyExpr (FunCall id args) 
-    = id ++ " (" ++ prettyArgs ++ ")"
-    where prettyArgs = join ", " $ map prettyExpr args
+    pretty (FunCall id args) 
+        = id ++ " (" ++ prettyArgs ++ ")"
+        where prettyArgs = join ", " $ map pretty args
 
-prettyPred :: Pred -> String
-prettyPred (e1, op, e2) = joinExpr e1 prettyOp e2
-    where prettyOp = case op of
-            Less -> " < "
-            More -> " > "
-            Eq -> " == "
+instance Pretty Pred where
+    pretty (e1, op, e2) = prettyJoin e1 (pretty op) e2
 
--- Joins two expressions with a separator
-joinExpr :: Expr -> String -> Expr -> String
-joinExpr e1 sep e2 = prettyExpr e1 ++ sep ++ prettyExpr e2
+instance Pretty PredOp where
+    pretty Less = " < "
+    pretty More = " > "
+    pretty Eq = " == "
+
+prettyJoin :: Pretty a => a -> String -> a -> String
+prettyJoin s1 sep s2 = pretty s1 ++ sep ++ pretty s2
 
 -----------------------------------------------------------------------------
 -- FP5.4 (partial application)
@@ -292,7 +295,7 @@ findVar ((nx,x):xs) n
     | nx /= n = findVar xs n
     | otherwise = Just x
 
--- Testing
+-- Testing evaluators
 prop_eval_fib1 = eval prog_fibonacci "fibonacci" [10] == 55
 prop_eval_fib2 = eval prog_fib  "fib" [10] == 55
 prop_eval_sum  = eval prog_sum  "sum" [8] == 36 
