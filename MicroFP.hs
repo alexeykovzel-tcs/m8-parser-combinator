@@ -9,6 +9,7 @@ module MicroFP where
 import Control.Applicative
 import PComb
 import BasicParsers
+import Data.Maybe
 import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
 
@@ -53,8 +54,8 @@ data PredOp
 -- The following functions in µFP EDSL correspond 
 -- to the definitions in functions.txt.
 
-fibonacciProg :: Prog
-fibonacciProg = [
+prog_fibonacci :: Prog
+prog_fibonacci = [
     FunDecl "fibonacci" [IntArg 0] (Fixed 0),
     FunDecl "fibonacci" [IntArg 1] (Fixed 1),
     FunDecl "fibonacci" [VarArg "n"] (Add addL addR) ]
@@ -62,35 +63,35 @@ fibonacciProg = [
         addL = FunCall "fibonacci" [Sub (Var "n") (Fixed 1)]
         addR = FunCall "fibonacci" [Sub (Var "n") (Fixed 2)]
 
-fibProg :: Prog
-fibProg = [ FunDecl "fib" [VarArg "n"] body ]
+prog_fib :: Prog
+prog_fib = [ FunDecl "fib" [VarArg "n"] body ]
     where
         pred = (Var "n", Less, Fixed 3)
         body = Cond pred (Fixed 1) (Add addL addR)
         addL = FunCall "fib" [Sub (Var "n") (Fixed 1)]
         addR = FunCall "fib" [Sub (Var "n") (Fixed 2)]
 
-sumProg :: Prog
-sumProg = [ 
+prog_sum :: Prog
+prog_sum = [ 
     FunDecl "sum" [IntArg 0] (Fixed 0),
     FunDecl "sum" [VarArg "a"] (Add recSum (Var "a")) ]
     where 
         recSum = FunCall "sum" [Sub (Var "a") (Fixed 1)]
 
-divProg :: Prog
-divProg = [ FunDecl "div" [VarArg "x", VarArg "y"] body ]
+prog_div :: Prog
+prog_div = [ FunDecl "div" [VarArg "x", VarArg "y"] body ]
     where
         divcall = FunCall "div" [Sub (Var "x") (Var "y"), Var "y"]
         pred = (Var "x", Less, Var "y")
         body = (Cond pred (Fixed 0) (Add (Fixed 1) divcall))
 
-twiceProg :: Prog
-twiceProg = [ 
+prog_twice :: Prog
+prog_twice = [ 
     FunDecl "twice" [VarArg "f", VarArg "x"] 
     (FunCall "f" [FunCall "f" [Var "x"]]) ]
 
-combProg :: Prog
-combProg = [
+prog_comb :: Prog
+prog_comb = [
     FunDecl "add" [VarArg "x", VarArg "y"] (Add (Var "x") (Var "y")),
     FunDecl "inc" [] (FunCall "add" [Fixed 1]),
     FunDecl "eleven" [] (FunCall "inc" [Fixed 10]) ]
@@ -103,12 +104,12 @@ combProg = [
 -- that corresponds to the grammar of µFP. 
 
 pretty :: Prog -> String
-pretty xs = join " " $ prettyStmt <$> xs
+pretty = unwords . map prettyStmt
 
 prettyStmt :: Stmt -> String
 prettyStmt (FunDecl id args expr)
-    = id ++ " " ++ prettyArgs ++ " := " ++ prettyExpr expr ++ ";"
-    where prettyArgs = join " " (map prettyArg args)
+    = unwords [id, prettyArgs, ":=", prettyExpr expr, ";"]
+    where prettyArgs = unwords $ map prettyArg args
 
 prettyArg :: Arg -> String
 prettyArg (IntArg x) = show x
@@ -117,9 +118,10 @@ prettyArg (VarArg x) = x
 prettyExpr :: Expr -> String
 prettyExpr (Fixed  x) = show x
 prettyExpr (Var    x) = x
-prettyExpr (Add  x y) = prettyExpr x ++ " + "  ++ prettyExpr y 
-prettyExpr (Sub  x y) = prettyExpr x ++ " - "  ++ prettyExpr y 
-prettyExpr (Mult x y) = prettyExpr x ++ " * "  ++ prettyExpr y 
+
+prettyExpr (Add  x y) = joinExpr x " + " y 
+prettyExpr (Sub  x y) = joinExpr x " - " y 
+prettyExpr (Mult x y) = joinExpr x " * " y 
 
 prettyExpr (Cond pred e1 e2) 
     = "if (" ++ prettyPred pred ++ ")"
@@ -128,84 +130,176 @@ prettyExpr (Cond pred e1 e2)
 
 prettyExpr (FunCall id args) 
     = id ++ " (" ++ prettyArgs ++ ")"
-    where prettyArgs = join ", " (map prettyExpr args)
+    where prettyArgs = join ", " $ map prettyExpr args
 
 prettyPred :: Pred -> String
-prettyPred (e1, op, e2) 
-    = prettyExpr e1 ++ prettyOp ++ prettyExpr e2
+prettyPred (e1, op, e2) = joinExpr e1 prettyOp e2
     where prettyOp = case op of
             Less -> " < "
             More -> " > "
             Eq -> " == "
 
+-- Joins two expressions with a separator
+joinExpr :: Expr -> String -> Expr -> String
+joinExpr e1 sep e2 = prettyExpr e1 ++ sep ++ prettyExpr e2
+
 -----------------------------------------------------------------------------
--- FP3.4 ; FP5.2
+-- FP5.4 (partial application)
 -----------------------------------------------------------------------------
 
--- Evaluator for your µFP EDSL without support for 
--- partial application, lazy evaluation and higher order functions.
+-- Program preprocessing before evaluation
+-- (e.g. support for partial application)
+preEval :: Prog -> Prog
+preEval prog = prePartial [] prog
 
-type LUT = [(String, Integer)]
+-- Completes partially applied functions
+prePartial :: Prog -> Prog -> Prog
+prePartial _ [] = []
+prePartial prog (x:xs) = y : prePartial (y:prog) xs 
+    where y = preStmt prog x
 
-data Context = Ctx { prog :: Prog, vars :: LUT }
+-- If a function has a function call as its expression,
+-- then add missing arguments if it is partially applied
+preStmt :: Prog -> Stmt -> Stmt
+preStmt prog decl@(FunDecl name args (FunCall id vals))
+    | not (isArg id args) && valsLeft /= 0 = fullDecl
+    | otherwise = decl
+    where 
+        valsLeft  = arity prog id - length vals
+        ghostArgs = genArgs valsLeft
+        fullArgs  = args ++ (VarArg <$> ghostArgs)
+        fullVals  = vals ++ (Var <$> ghostArgs)
+        fullDecl  = FunDecl name fullArgs (FunCall id fullVals)
 
+-- If an expression is not a function call, 
+-- then there cannot be partial application
+preStmt _ stmt = stmt
+
+-- Checks if arguments contain the given id
+isArg :: String -> [Arg] -> Bool
+isArg id ((IntArg _):xs) = isArg id xs
+isArg id ((VarArg name):xs) = id == name || isArg id xs
+isArg id [] = False
+
+-- Generates missing arguments for 
+-- a partially applied function
+genArgs :: Int -> [String]
+genArgs 0 = []
+genArgs num = ("_" ++ show num) : genArgs (num - 1)
+
+-- Gets function arity by its name
+arity :: Prog -> String -> Int
+arity [] id = error $ "Such function doesn't exist: " ++ id
+arity ((FunDecl name args _):xs) id
+    | name == id = length args
+    | otherwise  = arity xs id
+
+-----------------------------------------------------------------------------
+-- FP3.4 ; FP5.2 ; FP5.5
+-----------------------------------------------------------------------------
+
+-- Context contains variables and the program itself
+data Context = Ctx { vars :: LUT, text :: Prog }
+
+-- Look-up table that contains variable values
+type LUT = [(String, Val)]
+
+-- "Val" is what variables can contain, it can be either
+-- an integer or a function reference ( FP5.5 ) 
+data Val
+    = Int Integer
+    | Fun String
+    deriving (Show, Eq)
+
+-- Evaluator for µFP EDSL
 eval :: Prog -> String -> [Integer] -> Integer
-eval prog name args = evalFun prog prog name args
+eval rawProg name args = (\(Int x) -> x) result
+    where 
+        result = evalFun prog prog name (Int <$> args)
+        prog = preEval rawProg
 
-evalFun :: Prog -> Prog -> String -> [Integer] -> Integer
-evalFun prog ((FunDecl dn args expr):funs) n vals
-    | dn == n && argsMatch args vals = evalExpr ctx expr
-    | otherwise = evalFun prog funs n vals
-    where ctx = Ctx prog $ bindVars args vals
+-- Evaluates the first function in the program 
+-- by using pattern matching ( FP5.2 ) 
+evalFun :: Prog -> Prog -> String -> [Val] -> Val
+evalFun _ [] id vals = error $ unwords ["No match found:", id, show vals]
+evalFun prog ((FunDecl name args expr):funs) id vals
+    | name == id && funMatch args vals = result
+    | otherwise = evalFun prog funs id vals
+    where 
+        result = evalExpr (Ctx vars prog) expr
+        vars = bindVals args vals
 
-evalExpr :: Context -> Expr -> Integer
-evalExpr _   (Fixed x) = x
-evalExpr ctx (Var   x) = findVar (vars ctx) x
+evalExpr :: Context -> Expr -> Val
+evalExpr _ (Fixed x) = Int x
 
+-- Evaluates a variable as either an integer 
+-- or a function reference
+evalExpr ctx (Var name) = case var of
+    Just val -> val
+    Nothing  -> Fun name
+    where var = findVar (vars ctx) name
+
+-- Evaluates an if/else condition
 evalExpr ctx (Cond pred e1 e2)
     | evalPred ctx pred = evalExpr ctx e1
     | otherwise = evalExpr ctx e2
 
-evalExpr ctx (FunCall name args) 
-    = evalFun p p name (evalExpr ctx <$> args)
-    where p = prog ctx
+-- Evaluates a function call as either an argument of 
+-- a higher order function ( FP5.5 ), or as a global function
+evalExpr ctx (FunCall id args)
+    = evalFun prog prog funId (evalExpr ctx <$> args)
+    where 
+        prog = text ctx
+        funId = case findVar (vars ctx) id of
+            Just (Fun name) -> name
+            _ -> id
 
+-- Evaluates a binary expression
 evalExpr ctx expr = case expr of
-    (Add  e1 e2) -> evalExpr ctx e1 + evalExpr ctx e2
-    (Sub  e1 e2) -> evalExpr ctx e1 - evalExpr ctx e2
-    (Mult e1 e2) -> evalExpr ctx e1 * evalExpr ctx e2
+    (Add  e1 e2) -> apply (+) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Sub  e1 e2) -> apply (-) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Mult e1 e2) -> apply (*) (evalExpr ctx e1) (evalExpr ctx e2)
+    where apply op (Int x) (Int y) = Int $ op x y
 
 evalPred :: Context -> Pred -> Bool
-evalPred ctx (e1, Less, e2) = evalExpr ctx e1 < evalExpr ctx e2
-evalPred ctx (e1, More, e2) = evalExpr ctx e1 > evalExpr ctx e2
-evalPred ctx (e1, Eq,   e2) = evalExpr ctx e1 == evalExpr ctx e2
+evalPred ctx pred = case pred of
+    (e1, Less, e2) -> apply (<)  (evalExpr ctx e1) (evalExpr ctx e2)
+    (e1, More, e2) -> apply (>)  (evalExpr ctx e1) (evalExpr ctx e2)
+    (e1, Eq,   e2) -> apply (==) (evalExpr ctx e1) (evalExpr ctx e2)
+    where apply op (Int x) (Int y) = op x y
 
--- Init LUT for variables prior to function call
-bindVars :: [Arg] -> [Integer] -> LUT
-bindVars [] [] = []
-bindVars ((IntArg _):xs) (_:ys) = bindVars xs ys
-bindVars ((VarArg x):xs) (y:ys) = (x, y) : bindVars xs ys
+-- Binds values to arguments prior to function call
+bindVals :: [Arg] -> [Val] -> LUT
+bindVals [] [] = []
+bindVals ((IntArg _):xs) (_:ys) = bindVals xs ys
+bindVals ((VarArg x):xs) (y:ys) = (x, y) : bindVals xs ys
 
--- Check if values match function's arguments
-argsMatch :: [Arg] -> [Integer] -> Bool
-argsMatch args vals
+-- Checks if values match function's arguments
+funMatch :: [Arg] -> [Val] -> Bool
+funMatch args vals
     | length args /= length vals = False
     | otherwise = and $ zipWith match args vals
-    where match (IntArg x) y = x == y
-          match (VarArg _) _ = True
+    where 
+        match (VarArg _) _ = True
+        match (IntArg x) val = case val of
+            (Int y) -> x == y
+            _       -> False
 
--- Find variable value in LUT by its name
-findVar :: LUT -> String -> Integer
-findVar [] _ = error "Such variable does not exist"
+-- Finds variable value in LUT by its name
+findVar :: LUT -> String -> Maybe Val
+findVar [] _ = Nothing
 findVar ((nx,x):xs) n
     | nx /= n = findVar xs n
-    | otherwise = x
+    | otherwise = Just x
 
 -- Testing
-prop_eval_fibonacci = eval fibonacciProg "fibonacci" [10] == 55
-prop_eval_fib = eval fibProg "fib" [10] == 55
-prop_eval_sum = eval sumProg "sum" [8] == 36 
-prop_eval_div = eval divProg "div" [15, 7] == 2
+prop_eval_fib1 = eval prog_fibonacci "fibonacci" [10] == 55
+prop_eval_fib2 = eval prog_fib  "fib" [10] == 55
+prop_eval_sum  = eval prog_sum  "sum" [8] == 36 
+prop_eval_div  = eval prog_div  "div" [15, 7] == 2
+prop_eval_add  = eval prog_comb "add" [10, 40] == 50
+prop_eval_inc  = eval prog_comb "inc" [100] == 101
+prop_eval_elvn = eval prog_comb "eleven" [] == 11
 
 -----------------------------------------------------------------------------
 -- FP4.1
@@ -264,6 +358,8 @@ predicateOp =
     <|> More <$ symbol ">"
     <|> Less <$ symbol "=="
 
+-- Chains expressions like this:
+-- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))
 chain :: Parser a -> Parser (a -> a -> a) -> Parser a
 chain p op = reorder <$> p <*> op <*> chain p op <|> p
   where reorder x f y = f x y
@@ -278,10 +374,11 @@ compile :: String -> Prog
 compile code = fst $ head $ parse program code
 
 -- Testing
-prop_compile_fibonacci = fibonacciProg == (compile $ pretty fibonacciProg)
-prop_compile_fib = fibProg == (compile $ pretty fibProg)
-prop_compile_sum = sumProg == (compile $ pretty sumProg)
-prop_compile_div = divProg == (compile $ pretty divProg)
+prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
+prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
+prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
+prop_compile_div  = prog_div  == (compile $ pretty prog_div)
+prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
 
 -----------------------------------------------------------------------------
 -- FP4.3
@@ -303,10 +400,11 @@ evalLast args prog = eval prog name args
 -----------------------------------------------------------------------------
 
 -- Joins strings using a separator
+-- e.g. join ", " ["Hi", "John"] = "Hi, John"
 join :: String -> [String] -> String
 join _ [x]      = x
 join sep (x:xs) = x ++ sep ++ (join sep xs)
 
--- Run all tests
+-- Runs all tests
 return []
 check = $quickCheckAll
