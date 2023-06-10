@@ -23,8 +23,11 @@ data Parser a = P {
 
 data ErrorHandler a b = ParseError a | Result b deriving Show
 
-extractResult :: ErrorHandler a b -> b
-extractResult (Result b) = b
+getResult :: ErrorHandler a b -> b
+getResult (Result b) = b
+
+getError :: ErrorHandler a b -> a
+getError (ParseError a) = a
 
 -- Parse errors
 data ParseError = ParsePredicateOpError
@@ -85,8 +88,8 @@ instance Applicative Parser where
     p1 <*> p2 = 
         P (\xs -> Result [
             (a b, zs) | 
-            (a, ys) <- extractResult $ parse p1 xs,
-            (b, zs) <- extractResult $ parse p2 ys 
+            (a, ys) <- getResult $ parse p1 xs,
+            (b, zs) <- getResult $ parse p2 ys 
         ])
 
 -----------------------------------------------------------------------------
@@ -96,7 +99,7 @@ instance Applicative Parser where
 instance Alternative Parser where
     empty = failure
     p1 <|> p2 = P (\xs ->
-        case (extractResult $ parse p1 xs) of
+        case (getResult $ parse p1 xs) of
             [] -> parse p2 xs
             r -> Result r
         )
