@@ -368,11 +368,10 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
   where reorder x f y = f x y
 
 -----------------------------------------------------------------------------
--- FP4.2
+-- FP4.2, FP5.1
 -----------------------------------------------------------------------------
 
 -- Parsing a textual representation of µFP to EDSL.
-
 compile :: String -> Prog
 compile code = fst $ head $ parse program code
 
@@ -382,6 +381,20 @@ prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
 prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
 prop_compile_div  = prog_div  == (compile $ pretty prog_div)
 prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
+
+-----------------------------------------------------------------------------
+-- FP5.1
+-----------------------------------------------------------------------------
+
+-- Parser combinator (Not finished)
+(<?>) :: Parser a -> String -> Parser a
+p <?> str = p
+
+-- -- Parse Error Handlers
+-- parsePredicateOp :: Parser a -> Either ParseError (Parser a)
+-- parsePredicateOp p =
+--     case p of
+--         failure -> Left $ ParsePredicateOpError
 
 -----------------------------------------------------------------------------
 -- FP4.3

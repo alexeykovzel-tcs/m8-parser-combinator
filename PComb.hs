@@ -17,8 +17,25 @@ data Stream
 -----------------------------------------------------------------------------
 
 data Parser a = P {
-    parse :: String -> [(a, String)]
+    -- parse :: String -> [(a, String)]
+    parse :: String -> ErrorHandler ParseError [(a, String)]
 }
+
+data ErrorHandler a b = ParseError a | Result b deriving Show
+
+-- Parse errors
+data ParseError = ParsePredicateOpError
+                | ParsePredicateError
+                | ParseConditionError
+                | ParseFunCallError
+                | ParseFactorError
+                | ParseTermError
+                | ParseExpressionError
+                | ParseArgumentError
+                | ParseStatementError
+                | ParseProgramError
+                | DefaultError
+                deriving Show
 
 -----------------------------------------------------------------------------
 -- FP1.2
@@ -26,11 +43,11 @@ data Parser a = P {
 
 -- Applies function to the parsed value
 instance Functor Parser where
-    fmap f p = 
-        P (\xs -> [
-            (f a, ys) | 
-            (a, ys) <- parse p xs 
-        ])
+    fmap f (P p) = P (\xs -> 
+        case (p xs) of
+            ParseError e -> ParseError DefaultError
+            Result r -> Result [(f a, ys) | (a, ys) <- r]
+        )
 
 -----------------------------------------------------------------------------
 -- FP1.3
@@ -39,10 +56,10 @@ instance Functor Parser where
 -- Parses char if predicate returns true
 charIf :: (Char -> Bool) -> Parser Char
 charIf pred = P p
-    where p [] = []
+    where p [] = ParseError DefaultError
           p (x:xs)
-            | pred x = [(x, xs)]
-            | otherwise = []
+            | pred x = Result [(x, xs)]
+            | otherwise = ParseError DefaultError
 
 -- Parses a predefined char
 char :: Char -> Parser Char
@@ -54,13 +71,13 @@ char x = charIf (\y -> x == y)
 
 -- Parser that always fails
 failure :: Parser a
-failure = P (\_ -> [])
+failure = P (\_ -> ParseError DefaultError)
 
 -----------------------------------------------------------------------------
 -- FP1.5
 -----------------------------------------------------------------------------
 
-instance Applicative Parser where
+-- instance Applicative Parser where
     pure a = P (\xs -> [(a, xs)])
     p1 <*> p2 = 
         P (\xs -> [
@@ -73,9 +90,9 @@ instance Applicative Parser where
 -- FP1.6
 -----------------------------------------------------------------------------
 
-instance Alternative Parser where
-    empty = failure
-    p1 <|> p2 = P $ \xs ->
-        case (parse p1 xs) of
-            [] -> parse p2 xs
-            r -> r
+-- instance Alternative Parser where
+--     empty = failure
+--     p1 <|> p2 = P $ \xs ->
+--         case (parse p1 xs) of
+--             [] -> parse p2 xs
+--             r -> r
