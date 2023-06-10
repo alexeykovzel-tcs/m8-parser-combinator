@@ -17,7 +17,6 @@ data Stream
 -----------------------------------------------------------------------------
 
 data Parser a = P {
-    -- parse :: String -> [(a, String)]
     parse :: String -> ErrorHandler ParseError [(a, String)]
 }
 
