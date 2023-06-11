@@ -17,30 +17,39 @@ data Stream
 -----------------------------------------------------------------------------
 
 data Parser a = P {
-    parse :: String -> ErrorHandler ParseError [(a, String)]
+    parse :: String -> ErrorHandler [(Scanner, String)] [(a, String)]
 }
 
 data ErrorHandler a b = ParseError a | Result b deriving Show
 
+-----------------------------------------------------------------------------
+-- FP5.1
+-----------------------------------------------------------------------------
+
+-- Position scanner where parse error occurs
+data Scanner = Position String Int Int deriving (Eq, Ord)
+
+instance Show Scanner where
+    show (Position _str row column) = show row ++ ":" ++ show column
+
+-- Initializes a scanner
+initScanner :: Scanner
+initScanner = Position "" 1 1
+
+-- Updates a scanner line and column position depends on the char
+updateScanner :: Scanner -> Char -> Scanner
+updateScanner (Position str row column) c
+    | c == '\n' = Position str (row+1) 1
+    | c == '\t' = Position str row (column + 8 - ((column-1) `mod` 8))
+    | otherwise = Position str row (column + 1)
+
+-- Scans a string and returns position
+scan :: Scanner -> String -> Scanner
+scan pos str = foldl updateScanner pos str
+
 getResult :: ErrorHandler a b -> b
-getResult (Result b) = b
-
-getError :: ErrorHandler a b -> a
-getError (ParseError a) = a
-
--- Parse errors
-data ParseError = ParsePredicateOpError
-                | ParsePredicateError
-                | ParseConditionError
-                | ParseFunCallError
-                | ParseFactorError
-                | ParseTermError
-                | ParseExpressionError
-                | ParseArgumentError
-                | ParseStatementError
-                | ParseProgramError
-                | DefaultError
-                deriving Show
+getResult (Result r) = r
+getResult (ParseError _) = error "ParseError"
 
 -----------------------------------------------------------------------------
 -- FP1.2
@@ -50,7 +59,7 @@ data ParseError = ParsePredicateOpError
 instance Functor Parser where
     fmap f (P p) = P (\xs -> 
         case (p xs) of
-            ParseError e -> ParseError DefaultError
+            ParseError e -> ParseError []
             Result r -> Result [(f a, ys) | (a, ys) <- r]
         )
 
@@ -61,10 +70,10 @@ instance Functor Parser where
 -- Parses char if predicate returns true
 charIf :: (Char -> Bool) -> Parser Char
 charIf pred = P p
-    where p [] = ParseError DefaultError
+    where p [] = ParseError []
           p (x:xs)
             | pred x = Result [(x, xs)]
-            | otherwise = ParseError DefaultError
+            | otherwise = ParseError []
 
 -- Parses a predefined char
 char :: Char -> Parser Char
@@ -76,7 +85,7 @@ char x = charIf (\y -> x == y)
 
 -- Parser that always fails
 failure :: Parser a
-failure = P (\_ -> ParseError DefaultError)
+failure = P (\_ -> ParseError [])
 
 -----------------------------------------------------------------------------
 -- FP1.5
@@ -90,6 +99,7 @@ instance Applicative Parser where
             (a, ys) <- getResult $ parse p1 xs,
             (b, zs) <- getResult $ parse p2 ys 
         ])
+
 
 -----------------------------------------------------------------------------
 -- FP1.6

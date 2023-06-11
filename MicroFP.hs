@@ -372,41 +372,15 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
 -----------------------------------------------------------------------------
 
 -- Parsing a textual representation of µFP to EDSL.
--- compile :: String -> Prog
--- compile code = fst $ head $ parse program code
+compile :: String -> Prog
+compile code = fst $ head $ getResult $ parse program code
 
--- -- Testing
--- prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
--- prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
--- prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
--- prop_compile_div  = prog_div  == (compile $ pretty prog_div)
--- prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
-
------------------------------------------------------------------------------
--- FP5.1
------------------------------------------------------------------------------
-
-type Line = Int
-type Column = Int
-
-data Position = Position String Line Column deriving (Eq, Ord, Show)
-
-initPos :: String -> Position
-initPos str = Position str 1 1
-
-updatePosChar :: Position -> Char -> Position
-updatePosChar (Position str line column) c =
-    case c of
-        '\n' -> Position str (line+1) 1
-        '\t' -> Position str line (column + 8 - ((column-1) `mod` 8))
-        _    -> Position str line (column + 1)
-
-updatePosString :: Position -> String -> Position
-updatePosString pos str = foldl updatePosChar pos str
-
--- Parser combinator (Not finished)
-(<?>) :: Parser a -> String -> Parser a
-p <?> str = p
+-- -- -- Testing
+prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
+prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
+prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
+prop_compile_div  = prog_div  == (compile $ pretty prog_div)
+prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
 
 -----------------------------------------------------------------------------
 -- FP4.3
