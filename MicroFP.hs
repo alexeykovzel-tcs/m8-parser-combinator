@@ -13,6 +13,7 @@ import BasicParsers
 import Data.Maybe
 import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
+import Data.Char
 
 -----------------------------------------------------------------------------
 -- FP3.1
@@ -404,6 +405,59 @@ runFile path args = evalLast args <$> compile <$> readFile path
 evalLast :: [Integer] -> Prog -> Integer
 evalLast args prog = eval prog name args
     where name = (\(FunDecl name _ _) -> name) $ last prog
+
+-----------------------------------------------------------------------------
+-- FP5.3
+-----------------------------------------------------------------------------
+-- gets a program and returns a program in if-else form (Cond)
+patmatch :: Prog -> Prog
+patmatch ((FunDecl name (x:xs) expr1):fs) 
+    | isIntArg x = [(FunDecl name args expr2)] 
+    | isVarArg x = [(FunDecl name args expr1)]
+    where
+        args = [VarArg var]
+        expr2 = (Cond (Var var, Eq, (Fixed num)) expr1 (matchRest fs))
+        num = argToInt x
+        var = varFromProg fs
+        
+-- after the initial Stmt is converted the rest will be converted here
+matchRest :: [Stmt] -> Expr
+matchRest ((FunDecl _ (x:xs) expr):fs) 
+    | isIntArg x = (Cond pred expr1 expr2)
+    | isVarArg x = expr
+    where 
+        pred = (Var var, Eq, (Fixed num))
+        expr1 = expr
+        expr2 = matchRest fs
+        num = argToInt x
+        var = varFromProg fs
+
+-- checks wether the argument is an IntArg
+isIntArg :: Arg -> Bool
+isIntArg (IntArg _) = True
+isIntArg _ = False
+
+-- checks wether the argument is an VarArg
+isVarArg :: Arg -> Bool
+isVarArg (VarArg _) = True
+isVarArg _ = False
+
+-- converters of Arg to Integer and String
+argToInt :: Arg -> Integer
+argToInt (IntArg x) = x
+
+argToSt :: Arg -> String
+argToSt (VarArg x) = x
+
+-- find Func call where var is not a digit and return that letter
+varFromProg :: Prog -> String
+varFromProg ((FunDecl name (x:xs) expr):fs) 
+    | isVarArg x = argToSt x
+    | otherwise = varFromProg fs
+
+-- tests for fibonacci and sum
+prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
+prop_eval_patmatch_sum  = eval (patmatch prog_sum)  "sum" [8] == 36 
 
 -----------------------------------------------------------------------------
 -- Utils
