@@ -13,8 +13,9 @@ import PComb
 -- FP2.1
 -----------------------------------------------------------------------------
 
-oneOf :: [Char] -> Parser Char
-oneOf xs = charIf (\x -> elem x xs)
+-- Parses a letter
+letter :: Parser Char
+letter = charIf isLetter
 
 -- Parses a lowercase letter
 lower :: Parser Char
@@ -23,10 +24,6 @@ lower = charIf isLower
 -- Parses an uppercase letter
 upper :: Parser Char
 upper = charIf isUpper
-
--- Parses a letter
-letter :: Parser Char
-letter = charIf isLetter
 
 -- Parses a digit
 dig :: Parser Char
@@ -42,6 +39,9 @@ between p1 p2 p3 = p1 *> p2 <* p3
 whitespace :: Parser a -> Parser a
 whitespace p = between ws p ws
     where ws = many $ oneOf " \t\n"
+
+oneOf :: [Char] -> Parser Char
+oneOf xs = charIf (\x -> elem x xs)
 
 -----------------------------------------------------------------------------
 -- FP2.3
@@ -75,7 +75,7 @@ identifier = whitespace $ (:) <$> lower <*> (many $ lower <|> dig)
 integer :: Parser Integer
 integer = whitespace $ read <$> some dig
 
--- Parses a given String surrounded by whitespaces
+-- Parses a given string surrounded by whitespaces
 symbol :: String -> Parser String
 symbol xs = whitespace $ string xs
 

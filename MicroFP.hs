@@ -256,7 +256,6 @@ evalExpr ctx expr = case expr of
     (Add  e1 e2) -> Int $ evalBin (+) ctx e1 e2
     (Sub  e1 e2) -> Int $ evalBin (-) ctx e1 e2
     (Mult e1 e2) -> Int $ evalBin (*) ctx e1 e2
-    where apply op (Int x) (Int y) = Int $ op x y
 
 -- Evaluates a predicate
 evalPred :: Context -> Pred -> Bool
@@ -382,7 +381,7 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
 -- Parsing a textual representation of µFP to EDSL.
 
 compile :: String -> Prog
-compile code = fst $ head $ parse program code
+compile code = fst $ head $ parse program $ Stream code
 
 -- Testing
 prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
@@ -419,7 +418,7 @@ patmatch ((FunDecl name ((IntArg x):_) expr):fs)
        = [(FunDecl name [VarArg var] cond)]
     where
         cond = Cond pred expr (matchRest fs)
-        pred = (Var var, Eq, (Fixed x))
+        pred = (Var var, Eq, Fixed x)
         var = varProg fs
 
 -- After the initial Stmt is converted the rest will be converted here
@@ -428,7 +427,7 @@ matchRest ((FunDecl _ ((VarArg x):_) expr):_) = expr
 matchRest ((FunDecl _ ((IntArg x):_) expr):fs) = cond
     where 
         cond = Cond pred expr $ matchRest fs
-        pred = (Var $ varProg fs, Eq, (Fixed x))
+        pred = (Var $ varProg fs, Eq, Fixed x)
 
 -- Finds function call where var is not a digit and returns that letter
 varProg :: Prog -> String

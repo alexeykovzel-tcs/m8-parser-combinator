@@ -17,7 +17,7 @@ data Stream
 -----------------------------------------------------------------------------
 
 data Parser a = P {
-    parse :: String -> [(a, String)]
+    parse :: Stream -> [(a, Stream)]
 }
 
 -----------------------------------------------------------------------------
@@ -39,9 +39,9 @@ instance Functor Parser where
 -- Parses char if predicate returns true
 charIf :: (Char -> Bool) -> Parser Char
 charIf pred = P p
-    where p [] = []
-          p (x:xs)
-            | pred x = [(x, xs)]
+    where p (Stream []) = []
+          p (Stream (x:xs))
+            | pred x = [(x, Stream xs)]
             | otherwise = []
 
 -- Parses a predefined char
