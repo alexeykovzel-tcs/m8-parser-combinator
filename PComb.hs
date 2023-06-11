@@ -17,7 +17,7 @@ data Stream
 -----------------------------------------------------------------------------
 
 data Parser a = P {
-    parse :: String -> ErrorHandler [(Scanner, String)] [(a, String)]
+    parse :: String -> ErrorHandler [(a, String)] [(a, String)]
 }
 
 data ErrorHandler a b = ParseError a | Result b deriving Show
@@ -49,7 +49,15 @@ scan pos str = foldl updateScanner pos str
 
 getResult :: ErrorHandler a b -> b
 getResult (Result r) = r
-getResult (ParseError _) = error "ParseError"
+getResult (ParseError e) = e
+
+-- Parser Combinator
+(<?>) :: Parser a -> String -> Parser a
+p <?> str = P (\xs ->
+    case (parse p xs) of
+        ParseError _ -> error str
+        Result r -> Result r
+    )
 
 -----------------------------------------------------------------------------
 -- FP1.2
@@ -85,7 +93,7 @@ char x = charIf (\y -> x == y)
 
 -- Parser that always fails
 failure :: Parser a
-failure = P (\_ -> ParseError [])
+failure = P (\_ -> Result [])
 
 -----------------------------------------------------------------------------
 -- FP1.5
@@ -107,8 +115,8 @@ instance Applicative Parser where
 
 instance Alternative Parser where
     empty = failure
-    p1 <|> p2 = P (\xs ->
-        case (getResult $ parse p1 xs) of
-            [] -> parse p2 xs
-            r -> Result r
+    p1 <|> p2 = P (\xs -> 
+        case (parse p1 xs) of
+            ParseError _ -> parse p2 xs
+            Result r -> Result r
         )

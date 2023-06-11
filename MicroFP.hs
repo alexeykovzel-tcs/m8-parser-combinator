@@ -390,8 +390,8 @@ prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
 -- the µFP function. When the file contains multiple functions, 
 -- the last function in the file is used.
 
--- runFile :: FilePath -> [Integer] -> IO Integer
--- runFile path args = evalLast args <$> compile <$> readFile path
+runFile :: FilePath -> [Integer] -> IO Integer
+runFile path args = evalLast args <$> compile <$> readFile path
 
 evalLast :: [Integer] -> Prog -> Integer
 evalLast args prog = eval prog name args
