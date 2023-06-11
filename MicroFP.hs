@@ -409,55 +409,35 @@ evalLast args prog = eval prog name args
 -----------------------------------------------------------------------------
 -- FP5.3
 -----------------------------------------------------------------------------
--- gets a program and returns a program in if-else form (Cond)
+
+-- Gets a program and returns a program in if-else form (Cond)
 patmatch :: Prog -> Prog
-patmatch ((FunDecl name (x:xs) expr1):fs) 
-    | isIntArg x = [(FunDecl name args expr2)] 
-    | isVarArg x = [(FunDecl name args expr1)]
+patmatch ((FunDecl name ((VarArg _):_) expr):fs) 
+       = [(FunDecl name [VarArg $ varProg fs] expr)]
+       
+patmatch ((FunDecl name ((IntArg x):_) expr):fs) 
+       = [(FunDecl name [VarArg var] cond)]
     where
-        args = [VarArg var]
-        expr2 = (Cond (Var var, Eq, (Fixed num)) expr1 (matchRest fs))
-        num = argToInt x
-        var = varFromProg fs
-        
--- after the initial Stmt is converted the rest will be converted here
+        cond = Cond pred expr (matchRest fs)
+        pred = (Var var, Eq, (Fixed x))
+        var = varProg fs
+
+-- After the initial Stmt is converted the rest will be converted here
 matchRest :: [Stmt] -> Expr
-matchRest ((FunDecl _ (x:xs) expr):fs) 
-    | isIntArg x = (Cond pred expr1 expr2)
-    | isVarArg x = expr
+matchRest ((FunDecl _ ((VarArg x):_) expr):_) = expr 
+matchRest ((FunDecl _ ((IntArg x):_) expr):fs) = cond
     where 
-        pred = (Var var, Eq, (Fixed num))
-        expr1 = expr
-        expr2 = matchRest fs
-        num = argToInt x
-        var = varFromProg fs
+        cond = Cond pred expr $ matchRest fs
+        pred = (Var $ varProg fs, Eq, (Fixed x))
 
--- checks wether the argument is an IntArg
-isIntArg :: Arg -> Bool
-isIntArg (IntArg _) = True
-isIntArg _ = False
+-- Finds function call where var is not a digit and returns that letter
+varProg :: Prog -> String
+varProg ((FunDecl _ ((VarArg x):_) _):fs) = x
+varProg ((FunDecl _ ((IntArg _):_) _):fs) = varProg fs
 
--- checks wether the argument is an VarArg
-isVarArg :: Arg -> Bool
-isVarArg (VarArg _) = True
-isVarArg _ = False
-
--- converters of Arg to Integer and String
-argToInt :: Arg -> Integer
-argToInt (IntArg x) = x
-
-argToSt :: Arg -> String
-argToSt (VarArg x) = x
-
--- find Func call where var is not a digit and return that letter
-varFromProg :: Prog -> String
-varFromProg ((FunDecl name (x:xs) expr):fs) 
-    | isVarArg x = argToSt x
-    | otherwise = varFromProg fs
-
--- tests for fibonacci and sum
+-- Tests for fibonacci and sum
 prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
-prop_eval_patmatch_sum  = eval (patmatch prog_sum)  "sum" [8] == 36 
+prop_eval_patmatch_sum = eval (patmatch prog_sum)  "sum" [8] == 36 
 
 -----------------------------------------------------------------------------
 -- Utils
