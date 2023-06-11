@@ -207,75 +207,89 @@ data Context = Ctx { vars :: LUT, text :: Prog }
 -- Look-up table that contains variable values
 type LUT = [(String, Val)]
 
--- "Val" is what variables can contain, it can be either
--- an integer or a function reference ( FP5.5 ) 
 data Val
-    = Int Integer
-    | Fun String
+    = Fun String        -- function reference ( FP5.5 )
+    | Int Integer       -- Fixed value
     deriving (Show, Eq)
 
 -- Evaluator for µFP EDSL
 eval :: Prog -> String -> [Integer] -> Integer
 eval rawProg name args = (\(Int x) -> x) result
     where 
-        result = evalFun prog prog name (Int <$> args)
+        result = evalFun prog name (Int <$> args)
         prog = preEval rawProg
 
--- Evaluates the first function in the program 
--- by using pattern matching ( FP5.2 ) 
-evalFun :: Prog -> Prog -> String -> [Val] -> Val
-evalFun _ [] id vals = error $ unwords ["No match found:", id, show vals]
-evalFun prog ((FunDecl name args expr):funs) id vals
-    | name == id && funMatch args vals = result
-    | otherwise = evalFun prog funs id vals
+-- Evaluates a function
+evalFun :: Prog -> String -> [Val] -> Val
+evalFun prog id vals = evalExpr ctx expr
     where 
-        result = evalExpr (Ctx vars prog) expr
-        vars = bindVals args vals
+        FunDecl _ args expr = findFun prog id vals
+        ctx = Ctx (bindVars args vals) prog
 
 evalExpr :: Context -> Expr -> Val
 evalExpr _ (Fixed x) = Int x
 
--- Evaluates a variable as either an integer 
--- or a function reference
+-- Evaluates a variable. if it's not found in LUT, 
+-- then we try to pass a global function
 evalExpr ctx (Var name) = case var of
     Just val -> val
     Nothing  -> Fun name
     where var = findVar (vars ctx) name
 
--- Evaluates an if/else condition
+-- Evaluates a condition
 evalExpr ctx (Cond pred e1 e2)
     | evalPred ctx pred = evalExpr ctx e1
     | otherwise = evalExpr ctx e2
 
--- Evaluates a function call as either an argument of 
--- a higher order function ( FP5.5 ), or as a global function
+-- Evaluates a function call
 evalExpr ctx (FunCall id args)
-    = evalFun prog prog funId (evalExpr ctx <$> args)
+    = evalFun (text ctx) name (evalExpr ctx <$> args)
     where 
-        prog = text ctx
-        funId = case findVar (vars ctx) id of
+        -- Function is either global or a variable
+        name = case findVar (vars ctx) id of
             Just (Fun name) -> name
-            _ -> id
+            _               -> id
 
--- Evaluates a binary expression
+-- Evaluates an arithmetic operation
 evalExpr ctx expr = case expr of
-    (Add  e1 e2) -> apply (+) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Sub  e1 e2) -> apply (-) (evalExpr ctx e1) (evalExpr ctx e2)
-    (Mult e1 e2) -> apply (*) (evalExpr ctx e1) (evalExpr ctx e2)
+    (Add  e1 e2) -> Int $ evalBin (+) ctx e1 e2
+    (Sub  e1 e2) -> Int $ evalBin (-) ctx e1 e2
+    (Mult e1 e2) -> Int $ evalBin (*) ctx e1 e2
     where apply op (Int x) (Int y) = Int $ op x y
 
+-- Evaluates a predicate
 evalPred :: Context -> Pred -> Bool
 evalPred ctx pred = case pred of
-    (e1, Less, e2) -> apply (<)  (evalExpr ctx e1) (evalExpr ctx e2)
-    (e1, More, e2) -> apply (>)  (evalExpr ctx e1) (evalExpr ctx e2)
-    (e1, Eq,   e2) -> apply (==) (evalExpr ctx e1) (evalExpr ctx e2)
-    where apply op (Int x) (Int y) = op x y
+    (e1, Less, e2) -> evalBin (<) ctx e1 e2
+    (e1, More, e2) -> evalBin (>) ctx e1 e2
+    (e1, Eq,   e2) -> evalBin (==) ctx e1 e2
 
--- Binds values to arguments prior to function call
-bindVals :: [Arg] -> [Val] -> LUT
-bindVals [] [] = []
-bindVals ((IntArg _):xs) (_:ys) = bindVals xs ys
-bindVals ((VarArg x):xs) (y:ys) = (x, y) : bindVals xs ys
+-- Evaluates a binary expression
+evalBin :: (Integer -> Integer -> a) -> Context -> Expr -> Expr -> a
+evalBin apply ctx e1 e2 = apply a b
+    where
+        Int a = evalExpr ctx e1
+        Int b = evalExpr ctx e2
+
+-- Binds variables to values prior to function call
+bindVars :: [Arg] -> [Val] -> LUT
+bindVars [] [] = []
+bindVars ((IntArg _):xs) (_:ys) = bindVars xs ys
+bindVars ((VarArg x):xs) (y:ys) = (x, y) : bindVars xs ys
+
+-- Finds a variable value in LUT by its name
+findVar :: LUT -> String -> Maybe Val
+findVar [] _ = Nothing
+findVar ((nx,x):xs) n
+    | nx /= n = findVar xs n
+    | otherwise = Just x
+
+-- Finds a function declaration via pattern matching ( FP5.2 )
+findFun :: Prog -> String -> [Val] -> Stmt
+findFun [] id vals = error $ unwords ["No match found:", id]
+findFun (fun@(FunDecl name args expr):funs) id vals
+    | name == id && funMatch args vals = fun
+    | otherwise = findFun funs id vals
 
 -- Checks if values match function's arguments
 funMatch :: [Arg] -> [Val] -> Bool
@@ -287,13 +301,6 @@ funMatch args vals
         match (IntArg x) val = case val of
             (Int y) -> x == y
             _       -> False
-
--- Finds variable value in LUT by its name
-findVar :: LUT -> String -> Maybe Val
-findVar [] _ = Nothing
-findVar ((nx,x):xs) n
-    | nx /= n = findVar xs n
-    | otherwise = Just x
 
 -- Testing evaluators
 prop_eval_fib1 = eval prog_fibonacci "fibonacci" [10] == 55
