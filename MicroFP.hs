@@ -14,6 +14,7 @@ import Data.Maybe
 import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
 import Data.Char
+import Data.List
 
 -----------------------------------------------------------------------------
 -- QuickCheck data types
@@ -443,12 +444,30 @@ evalLast args prog = eval prog name args
 -- FP5.3
 -----------------------------------------------------------------------------
 
--- Gets a program and returns a program in if-else form (Cond)
+{- 
+    Function to apply patmatch on each group of function declarations 
+    Constraints: The program can contain multiple with one argument(like prog_sum and prog_fibonacci)
+    however, will fail if the functions are declared in mixed order.
+-}
 patmatch :: Prog -> Prog
-patmatch ((FunDecl name ((VarArg _):_) expr):fs) 
-       = [(FunDecl name [VarArg $ varProg fs] expr)]
-       
-patmatch ((FunDecl name ((IntArg x):_) expr):fs) 
+patmatch prog = concatMap patmatchFunc (groupFuncs prog)
+
+-- Function to group function declarations by their name
+groupFuncs :: Prog -> [Prog]
+groupFuncs = groupBy sameFunDecl . sortOn funDeclName
+    where
+        funDeclName (FunDecl name _ _) = name
+        sameFunDecl (FunDecl name1 _ _) (FunDecl name2 _ _) = name1 == name2
+
+-- Gets a program and returns a program in if-else form (Cond)
+patmatchFunc :: Prog -> Prog
+patmatchFunc ((FunDecl name [] expr):fs) 
+       = [(FunDecl name [VarArg $ ""] expr)]
+patmatchFunc ((FunDecl name [(VarArg x)] expr):fs) 
+       = [(FunDecl name [VarArg $ x] expr)]
+patmatchFunc ((FunDecl name (x:y:xs) expr):fs) 
+       = [(FunDecl name (x:y:xs) expr)]
+patmatchFunc ((FunDecl name ((IntArg x):_) expr):fs) 
        = [(FunDecl name [VarArg var] cond)]
     where
         cond = Cond pred expr (matchRest fs)
@@ -465,12 +484,13 @@ matchRest ((FunDecl _ ((IntArg x):_) expr):fs) = cond
 
 -- Finds function call where var is not a digit and returns that letter
 varProg :: Prog -> String
+varProg [] = " "
 varProg ((FunDecl _ ((VarArg x):_) _):fs) = x
 varProg ((FunDecl _ ((IntArg _):_) _):fs) = varProg fs
 
 -- Tests for fibonacci and sum
 prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
-prop_eval_patmatch_sum = eval (patmatch prog_sum)  "sum" [8] == 36 
+prop_eval_patmatch_sum = eval (patmatch prog_sum)  "sum" [8] == 36
 
 -----------------------------------------------------------------------------
 -- Utils
