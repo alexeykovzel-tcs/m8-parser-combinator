@@ -313,53 +313,55 @@ program = some statement
 
 statement :: Parser Stmt
 statement = FunDecl
-    <$> identifier
-    <*> many argument
-    <*  symbol ":=" <*> expression
+    <$> (identifier <?> "identifier")
+    <*> (many argument <?> "arguments")
+    <*  symbol ":=" <*> (expression <?> "expression")
     <*  char ';'
 
 argument :: Parser Arg
-argument =  IntArg <$> integer 
-        <|> VarArg <$> identifier
+argument =  IntArg <$> (integer <?> "integer or identifier")
+        <|> VarArg <$> (identifier <?> "integer or identifier")
 
 expression :: Parser Expr
 expression = whitespace $ term `chain` op
-    where op = (Add <$ symbol "+")
-           <|> (Sub <$ symbol "-")
+    where op = (Add <$ symbol "+" <?> "+ or -")
+           <|> (Sub <$ symbol "-" <?> "+ or -")
 
 term :: Parser Expr
 term = factor `chain` op
-    where op = Mult <$ symbol "*"
+    where op = Mult <$ (symbol "*" <?> "*")
 
 factor :: Parser Expr
-factor = condition
-    <|> parens expression
-    <|> funCall
-    <|> Var   <$> identifier
-    <|> Fixed <$> integer
+factor = (condition <?> msg)
+    <|> (parens expression <?> msg)
+    <|> (funCall <?> msg)
+    <|> Var   <$> (identifier <?> msg)
+    <|> Fixed <$> (integer <?> msg)
+    where msg = "condition or expression or function call or identifier or integer"
 
 funCall :: Parser Expr
 funCall = FunCall
-    <$> identifier
-    <*> (parens $ sep expression $ symbol ",")
+    <$> (identifier <?> "identifier")
+    <*> (parens $ sep expression $ symbol "," <?> "expressions")
 
 condition :: Parser Expr
 condition = Cond
-    <$ symbol "if"   <*> parens predicate
-    <* symbol "then" <*> braces expression 
-    <* symbol "else" <*> braces expression
+    <$ (symbol "if" <?> "if") <*> (parens predicate <?> "predicate")
+    <* (symbol "then" <?> "then") <*> (braces expression <?> "expression")
+    <* (symbol "else" <?> "else") <*> (braces expression <?> "expression")
 
 predicate :: Parser Pred
 predicate = (,,)
-    <$> expression
-    <*> predicateOp
-    <*> expression
+    <$> (expression <?> "expression")
+    <*> (predicateOp <?> "predicate operation")
+    <*> (expression <?> "expression")
 
 predicateOp :: Parser PredOp
 predicateOp = 
-        Less <$ symbol "<"
-    <|> More <$ symbol ">"
-    <|> Less <$ symbol "=="
+        Less <$ (symbol "<" <?> msg)
+    <|> More <$ (symbol ">" <?> msg)
+    <|> Less <$ (symbol "==" <?> msg)
+    where msg = "< or > or =="
 
 -- Chains expressions like this:
 -- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))

@@ -17,7 +17,7 @@ data Stream
 -----------------------------------------------------------------------------
 
 data Parser a = P {
-    parse :: String -> ErrorHandler [(a, String)] [(a, String)]
+    parse :: String -> ErrorHandler Scanner [(a, String)]
 }
 
 data ErrorHandler a b = ParseError a | Result b deriving Show
@@ -49,13 +49,13 @@ scan pos str = foldl updateScanner pos str
 
 getResult :: ErrorHandler a b -> b
 getResult (Result r) = r
-getResult (ParseError e) = e
+getResult (ParseError e) = error "Error!"
 
 -- Parser Combinator
 (<?>) :: Parser a -> String -> Parser a
 p <?> str = P (\xs ->
     case (parse p xs) of
-        ParseError _ -> error str
+        ParseError e -> error $ "Parse error at " ++ show (scan e xs) ++ ", expected " ++ str
         Result r -> Result r
     )
 
@@ -67,7 +67,7 @@ p <?> str = P (\xs ->
 instance Functor Parser where
     fmap f (P p) = P (\xs -> 
         case (p xs) of
-            ParseError e -> ParseError []
+            ParseError e -> ParseError initScanner
             Result r -> Result [(f a, ys) | (a, ys) <- r]
         )
 
@@ -78,10 +78,10 @@ instance Functor Parser where
 -- Parses char if predicate returns true
 charIf :: (Char -> Bool) -> Parser Char
 charIf pred = P p
-    where p [] = ParseError []
+    where p [] = ParseError initScanner
           p (x:xs)
             | pred x = Result [(x, xs)]
-            | otherwise = ParseError []
+            | otherwise = ParseError initScanner
 
 -- Parses a predefined char
 char :: Char -> Parser Char
@@ -93,7 +93,7 @@ char x = charIf (\y -> x == y)
 
 -- Parser that always fails
 failure :: Parser a
-failure = P (\_ -> Result [])
+failure = P (\_ -> ParseError initScanner)
 
 -----------------------------------------------------------------------------
 -- FP1.5
