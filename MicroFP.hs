@@ -313,55 +313,61 @@ program = some statement
 
 statement :: Parser Stmt
 statement = FunDecl
-    <$> (identifier <?> "identifier")
-    <*> (many argument <?> "arguments")
-    <*  symbol ":=" <*> (expression <?> "expression")
+    <$> identifier
+    <*> many argument
+    <*  symbol ":=" <*> expression
     <*  char ';'
+    <?> "function declaration"
 
 argument :: Parser Arg
-argument =  IntArg <$> (integer <?> "integer or identifier")
-        <|> VarArg <$> (identifier <?> "integer or identifier")
+argument =  IntArg <$> integer
+        <|> VarArg <$> identifier
+        <?> "integer or identifier"
 
 expression :: Parser Expr
 expression = whitespace $ term `chain` op
-    where op = (Add <$ symbol "+" <?> "+ or -")
-           <|> (Sub <$ symbol "-" <?> "+ or -")
+    where op = (Add <$ symbol "+")
+           <|> (Sub <$ symbol "-")
+           <?> "addition or subtraction"
 
 term :: Parser Expr
 term = factor `chain` op
-    where op = Mult <$ (symbol "*" <?> "*")
+    where op = Mult <$ (symbol "*" <?> "multiplication")
 
 factor :: Parser Expr
-factor = (condition <?> msg)
-    <|> (parens expression <?> msg)
-    <|> (funCall <?> msg)
-    <|> Var   <$> (identifier <?> msg)
-    <|> Fixed <$> (integer <?> msg)
-    where msg = "condition or (expression) or function call or identifier or integer"
+factor = condition
+    <|> parens expression
+    <|> funCall
+    <|> Var   <$> identifier
+    <|> Fixed <$> integer
+    <?> "condition or function call or variable or constant"
 
 funCall :: Parser Expr
 funCall = FunCall
-    <$> (identifier <?> "identifier")
-    <*> (parens $ sep expression $ symbol "," <?> "expressions")
+    <$> identifier
+    <*> (parens $ sep expression $ symbol ",")
+    <?> "function call"
 
 condition :: Parser Expr
 condition = Cond
-    <$ (symbol "if" <?> "if") <*> (parens predicate <?> "predicate")
-    <* (symbol "then" <?> "then") <*> (braces expression <?> "expression")
-    <* (symbol "else" <?> "else") <*> (braces expression <?> "expression")
+    <$ symbol "if" <*> parens predicate
+    <* symbol "then" <*> braces expression
+    <* symbol "else" <*> braces expression
+    <?> "condition"
 
 predicate :: Parser Pred
 predicate = (,,)
-    <$> (expression <?> "expression")
-    <*> (predicateOp <?> "predicate operation")
-    <*> (expression <?> "expression")
+    <$> expression
+    <*> predicateOp
+    <*> expression
+    <?> "predicate"
 
 predicateOp :: Parser PredOp
 predicateOp = 
-        Less <$ (symbol "<" <?> msg)
-    <|> More <$ (symbol ">" <?> msg)
-    <|> Less <$ (symbol "==" <?> msg)
-    where msg = "< or > or =="
+        Less <$ symbol "<"
+    <|> More <$ symbol ">"
+    <|> Less <$ symbol "=="
+    <?> "operation < or > or =="
 
 -- Chains expressions like this:
 -- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))

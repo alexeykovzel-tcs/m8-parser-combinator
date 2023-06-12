@@ -75,7 +75,7 @@ p <?> str = P (\xs ->
 instance Functor Parser where
     fmap f (P p) = P (\xs -> 
         case (p xs) of
-            ParseError e -> ParseError (scan e xs)
+            ParseError e -> ParseError e
             Result r -> Result [(f a, ys) | (a, ys) <- r]
         )
 
@@ -108,7 +108,7 @@ failure = P (\_ -> ParseError initScanner)
 -----------------------------------------------------------------------------
 
 instance Applicative Parser where
-    pure a = P (\xs -> Result [(a, xs)])
+    pure p = P (\xs -> Result [(p, xs)])
     p1 <*> p2 = P (\xs -> 
         case (parse p1 xs) of
             (ParseError e) -> ParseError e
@@ -121,6 +121,8 @@ instance Applicative Parser where
 
 instance Alternative Parser where
     empty = failure
+    some p = (:) <$> p <*> many p
+    many p = some p <|> pure []
     p1 <|> p2 = P (\xs -> 
         case (parse p1 xs) of
             ParseError _ -> parse p2 xs
