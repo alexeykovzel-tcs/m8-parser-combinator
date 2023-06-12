@@ -22,22 +22,6 @@ data Parser a = P {
 
 data ErrorHandler a b = ParseError a | Result b deriving Show
 
-isError :: ErrorHandler a b -> Bool
-isError (ParseError _) = True
-isError (_) = False
-
-isResult :: ErrorHandler a b -> Bool
-isResult (Result _) = True
-isResult (_) = False
-
-getResult :: ErrorHandler a b -> b
-getResult (Result r) = r
-getResult (ParseError _) = error "Internal parse error!"
-
-getError :: ErrorHandler a b -> a
-getError (Result _) = error "Internal parse error!"
-getError (ParseError e) = e
-
 -----------------------------------------------------------------------------
 -- FP5.1
 -----------------------------------------------------------------------------
@@ -115,8 +99,8 @@ instance Applicative Parser where
     pure p = P (\xs -> Result [(p, xs)])
     p1 <*> p2 = P (\xs -> 
         case (parse p1 xs) of
-            (ParseError e) -> ParseError e
-            (Result [(a, str)]) -> parse (a <$> p2) str
+            ParseError e -> ParseError e
+            Result [(a, str)] -> parse (a <$> p2) str
         )
 
 -----------------------------------------------------------------------------
@@ -126,7 +110,7 @@ instance Applicative Parser where
 instance Alternative Parser where
     empty = failure
     some p = (:) <$> p <*> many p
-    many p = some p <|> pure empty
+    many p = some p <|> pure []
     p1 <|> p2 = P (\xs -> 
         case (parse p1 xs) of
             ParseError _ -> parse p2 xs

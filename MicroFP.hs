@@ -309,7 +309,7 @@ prop_eval_elvn = eval prog_comb "eleven" [] == 11
 -----------------------------------------------------------------------------
 
 program :: Parser Prog
-program = some statement
+program = some statement <?> "function declaration"
 
 statement :: Parser Stmt
 statement = FunDecl
@@ -317,22 +317,19 @@ statement = FunDecl
     <*> many argument
     <*  symbol ":=" <*> expression
     <*  char ';'
-    <?> "function declaration"
 
 argument :: Parser Arg
-argument =  IntArg <$> integer
-        <|> VarArg <$> identifier
-        <?> "integer or identifier"
+argument =  (IntArg <$> integer)
+        <|> (VarArg <$> identifier)
 
 expression :: Parser Expr
-expression = whitespace $ term `chain` op
+expression = (whitespace $ term `chain` op) <?> "addition or subtraction"
     where op = (Add <$ symbol "+")
            <|> (Sub <$ symbol "-")
-           <?> "addition or subtraction"
 
 term :: Parser Expr
 term = factor `chain` op
-    where op = Mult <$ (symbol "*" <?> "multiplication")
+    where op = (Mult <$ symbol "*")
 
 factor :: Parser Expr
 factor = condition
@@ -346,14 +343,12 @@ funCall :: Parser Expr
 funCall = FunCall
     <$> identifier
     <*> (parens $ sep expression $ symbol ",")
-    <?> "function call"
 
 condition :: Parser Expr
 condition = Cond
     <$ symbol "if" <*> parens predicate
     <* symbol "then" <*> braces expression
     <* symbol "else" <*> braces expression
-    <?> "condition"
 
 predicate :: Parser Pred
 predicate = (,,)
@@ -381,7 +376,7 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
 
 -- Parsing a textual representation of µFP to EDSL.
 compile :: String -> Prog
-compile code = fst $ head $ getResult $ parse program code
+compile code = fst $ head $ (\(Result r) -> r) $ parse program code
 
 -- -- -- Testing
 prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
