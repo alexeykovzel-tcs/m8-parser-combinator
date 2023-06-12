@@ -59,7 +59,7 @@ updateScanner (Position str row column) c
 scan :: Scanner -> String -> Scanner
 scan pos str = foldl updateScanner pos str
 
--- Parser Combinator
+-- Parser combinator
 (<?>) :: Parser a -> String -> Parser a
 p <?> str = P (\xs ->
     case (parse p xs) of
@@ -109,12 +109,11 @@ failure = P (\_ -> ParseError initScanner)
 
 instance Applicative Parser where
     pure a = P (\xs -> Result [(a, xs)])
-    p1 <*> p2 = 
-        P (\xs -> Result [
-            (a b, zs) | 
-            (a, ys) <- getResult $ parse p1 xs,
-            (b, zs) <- getResult $ parse p2 ys
-        ])
+    p1 <*> p2 = P (\xs -> 
+        case (parse p1 xs) of
+            ParseError e -> ParseError (scan e xs)
+            Result r -> ParseError (scan initScanner xs)
+            )
 
 
 -----------------------------------------------------------------------------
