@@ -111,10 +111,9 @@ instance Applicative Parser where
     pure a = P (\xs -> Result [(a, xs)])
     p1 <*> p2 = P (\xs -> 
         case (parse p1 xs) of
-            ParseError e -> ParseError (scan e xs)
-            Result r -> ParseError (scan initScanner xs)
-            )
-
+            (ParseError e) -> ParseError e
+            (Result [(a, str)]) -> parse (a <$> p2) str
+        )
 
 -----------------------------------------------------------------------------
 -- FP1.6

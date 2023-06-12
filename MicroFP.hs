@@ -337,7 +337,7 @@ factor = (condition <?> msg)
     <|> (funCall <?> msg)
     <|> Var   <$> (identifier <?> msg)
     <|> Fixed <$> (integer <?> msg)
-    where msg = "condition or expression or function call or identifier or integer"
+    where msg = "condition or (expression) or function call or identifier or integer"
 
 funCall :: Parser Expr
 funCall = FunCall
