@@ -34,6 +34,10 @@ getResult :: ErrorHandler a b -> b
 getResult (Result r) = r
 getResult (ParseError _) = error "Internal parse error!"
 
+getError :: ErrorHandler a b -> a
+getError (Result _) = error "Internal parse error!"
+getError (ParseError e) = e
+
 -----------------------------------------------------------------------------
 -- FP5.1
 -----------------------------------------------------------------------------
@@ -122,7 +126,7 @@ instance Applicative Parser where
 instance Alternative Parser where
     empty = failure
     some p = (:) <$> p <*> many p
-    many p = some p <|> pure []
+    many p = some p <|> pure empty
     p1 <|> p2 = P (\xs -> 
         case (parse p1 xs) of
             ParseError _ -> parse p2 xs
