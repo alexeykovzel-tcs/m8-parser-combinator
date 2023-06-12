@@ -22,6 +22,18 @@ data Parser a = P {
 
 data ErrorHandler a b = ParseError a | Result b deriving Show
 
+isError :: ErrorHandler a b -> Bool
+isError (ParseError _) = True
+isError (_) = False
+
+isResult :: ErrorHandler a b -> Bool
+isResult (Result _) = True
+isResult (_) = False
+
+getResult :: ErrorHandler a b -> b
+getResult (Result r) = r
+getResult (ParseError _) = error "Internal parse error!"
+
 -----------------------------------------------------------------------------
 -- FP5.1
 -----------------------------------------------------------------------------
@@ -47,10 +59,6 @@ updateScanner (Position str row column) c
 scan :: Scanner -> String -> Scanner
 scan pos str = foldl updateScanner pos str
 
-getResult :: ErrorHandler a b -> b
-getResult (Result r) = r
-getResult (ParseError e) = error "Error!"
-
 -- Parser Combinator
 (<?>) :: Parser a -> String -> Parser a
 p <?> str = P (\xs ->
@@ -67,7 +75,7 @@ p <?> str = P (\xs ->
 instance Functor Parser where
     fmap f (P p) = P (\xs -> 
         case (p xs) of
-            ParseError e -> ParseError initScanner
+            ParseError e -> ParseError (scan e xs)
             Result r -> Result [(f a, ys) | (a, ys) <- r]
         )
 
@@ -105,7 +113,7 @@ instance Applicative Parser where
         P (\xs -> Result [
             (a b, zs) | 
             (a, ys) <- getResult $ parse p1 xs,
-            (b, zs) <- getResult $ parse p2 ys 
+            (b, zs) <- getResult $ parse p2 ys
         ])
 
 
