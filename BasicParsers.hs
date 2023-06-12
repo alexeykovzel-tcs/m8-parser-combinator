@@ -29,6 +29,10 @@ upper = charIf isUpper
 dig :: Parser Char
 dig = charIf isDigit
 
+-- Examples:
+ex_letter   = parse letter $ Stream "abc"
+ex_dig      = parse dig $ Stream "123"
+
 -----------------------------------------------------------------------------
 -- FP2.2
 -----------------------------------------------------------------------------
@@ -42,6 +46,11 @@ whitespace p = between ws p ws
 
 oneOf :: [Char] -> Parser Char
 oneOf xs = charIf (\x -> elem x xs)
+
+-- Examples:
+ex_between      = parse (between (char '(') (char 'a') (char ')')) $ Stream "(a)b"
+ex_whitespace   = parse (whitespace $ string "a") $ Stream "\n a \n "
+ex_oneOf        = parse (oneOf "abc") $ Stream "banana"
 
 -----------------------------------------------------------------------------
 -- FP2.3
@@ -58,6 +67,13 @@ sep p s = sep1 p s <|> pure []
 -- Tries to apply parser p; upon failure it results in x
 option :: a -> Parser a -> Parser a
 option x p = p <|> pure x
+
+-- Examples:
+ex_sep1         = parse (sep1 (char 'a') (char ',')) $ Stream "a,a,a ccc"
+ex_sep1_fail    = parse (sep1 (char 'a') (char ',')) $ Stream "ccc"
+ex_sep          = parse (sep (char 'a') (char ',')) $ Stream "ccc"
+ex_option_fail  = parse (option 'b' (char 'a')) $ Stream "cba"
+ex_option       = parse (option 'b' (char 'a')) $ Stream "abc"
 
 -----------------------------------------------------------------------------
 -- FP2.4
@@ -86,3 +102,11 @@ parens p = between (char '(') p (char ')')
 -- Parses something using the provided parser between braces
 braces :: Parser a -> Parser a 
 braces p = between (char '{') p (char '}')
+
+-- Examples:
+ex_string       = parse (string "abc") $ Stream "abc"
+ex_identifier   = parse identifier $ Stream "a123"
+ex_integer      = parse integer $ Stream "123"
+ex_symbol       = parse (symbol "abc") $ Stream "\n abc \n"
+ex_parens       = parse (parens $ char 'a') $ Stream "(a)"
+ex_braces       = parse (braces $ char 'a') $ Stream "{a}"

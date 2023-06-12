@@ -16,6 +16,22 @@ import qualified Test.QuickCheck as QC
 import Data.Char
 
 -----------------------------------------------------------------------------
+-- QuickCheck data types
+-----------------------------------------------------------------------------
+
+data NonNegative = NonNeg Integer deriving (Eq, Show)
+
+data Positive = Pos Integer deriving (Eq, Show)
+
+-- Generates non-negative integers
+instance QC.Arbitrary NonNegative where
+    arbitrary = NonNeg <$> (abs <$> QC.arbitrary)
+
+-- Generates positive integers
+instance QC.Arbitrary Positive where
+    arbitrary = Pos <$> (QC.getPositive <$> QC.arbitrary)
+
+-----------------------------------------------------------------------------
 -- FP3.1
 -----------------------------------------------------------------------------
 
@@ -302,14 +318,32 @@ funMatch args vals
             (Int y) -> x == y
             _       -> False
 
--- Testing evaluators
+-- Testing functions from "functions.txt"
+prop_eval_fib1 :: Bool
 prop_eval_fib1 = eval prog_fibonacci "fibonacci" [10] == 55
-prop_eval_fib2 = eval prog_fib  "fib" [10] == 55
-prop_eval_sum  = eval prog_sum  "sum" [8] == 36 
-prop_eval_div  = eval prog_div  "div" [15, 7] == 2
-prop_eval_add  = eval prog_comb "add" [10, 40] == 50
-prop_eval_inc  = eval prog_comb "inc" [100] == 101
+
+prop_eval_fib2 :: Bool
+prop_eval_fib2 = eval prog_fib "fib" [10] == 55
+
+prop_eval_sum :: NonNegative -> Bool
+prop_eval_sum (NonNeg a) = eval prog_sum  "sum" [a] == test_sum a
+
+prop_eval_div :: Positive -> Positive -> Bool
+prop_eval_div (Pos a) (Pos b) = (a <= 0 || b <= 0) ||
+    eval prog_div  "div" [a, b] == a `div` b
+
+prop_eval_add :: Integer -> Integer -> Bool
+prop_eval_add a b = eval prog_comb "add" [a, b] == a + b
+
+prop_eval_inc :: Integer -> Bool
+prop_eval_inc a = eval prog_comb "inc" [a] == a + 1
+
+prop_eval_elvn :: Bool
 prop_eval_elvn = eval prog_comb "eleven" [] == 11
+
+test_sum :: Integer -> Integer
+test_sum 0 = 0
+test_sum n = n + (test_sum $ n - 1)
 
 -----------------------------------------------------------------------------
 -- FP4.1
