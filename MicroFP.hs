@@ -15,11 +15,12 @@ import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
 import Data.Char
 import Data.List
-import Debug.Trace
 
 -----------------------------------------------------------------------------
--- QuickCheck data types
+-- FP5.6
 -----------------------------------------------------------------------------
+-- The following declarations are used to define the EDSL as an instance of Arbitrary.
+-- Two QuickCheck test are defined. They are ran once you run the "check command".
 
 -- New type, where we make sure lists contain at least one element
 data NonEmptyList a = NonEmptyList [a]
@@ -31,6 +32,8 @@ instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
 data NonNegative = NonNeg Integer deriving (Eq, Show)
 
 data Positive = Pos Integer deriving (Eq, Show)
+
+-- EDSL as an instance of Arbitrary
 
 -- Generates non-negative integers
 instance QC.Arbitrary NonNegative where
@@ -78,6 +81,8 @@ instance QC.Arbitrary PredOp where
         pure Eq,
         pure More]
 
+-- random generators
+
 -- Generates a random name of length 3 which contains "fghk" for the function 
 gen_name :: QC.Gen String
 gen_name = QC.vectorOf 3 $ QC.elements "fghk"
@@ -89,6 +94,8 @@ gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
 -- Generates a random positive integer
 gen_integer :: Positive -> Integer
 gen_integer (Pos n) = n
+
+-- QuickCheck tests
 
 -- Test for expressions
 prop_expr :: Expr -> Bool
