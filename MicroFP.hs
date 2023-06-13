@@ -631,13 +631,15 @@ varProg ((FunDecl _ ((VarArg x):_) _):fs) = x
 varProg ((FunDecl _ ((IntArg _):_) _):fs) = varProg fs
 
 -- Tests for fibonacci and sum with "patmatch"
-prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
 prop_patmatch_sum :: NonNegative -> Bool
-prop_patmatch_sum (NonNeg a) = eval (patmatch prog_sum) "sum" [a] == test_sum a
+prop_patmatch_sum (NonNeg a) = 
+    eval (patmatch prog_sum) "sum" [a] 
+        == test_sum a
 
 prop_patmatch_fibonacci :: SmallNumber -> Bool
-prop_patmatch_fibonacci (SmallNum a) = eval (patmatch prog_fibonacci) "fibonacci" [a] 
-                                        == eval prog_fibonacci "fibonacci" [a]
+prop_patmatch_fibonacci (SmallNum a) =
+     eval (patmatch prog_fibonacci) "fibonacci" [a] 
+        == eval prog_fibonacci "fibonacci" [a]
 
 -- Test for fib and twice. Shows that functions 
 --with pattern matching are unchanged
@@ -646,7 +648,6 @@ prop_patmatch_fib = patmatch prog_fib == prog_fib
 
 prop_patmatch_twice :: Bool
 prop_patmatch_twice = patmatch prog_twice == prog_twice
-
 
 -----------------------------------------------------------------------------
 
