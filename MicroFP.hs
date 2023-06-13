@@ -102,6 +102,8 @@ prop_expr :: Expr -> Bool
 prop_expr expr = compileParser expression (pretty expr) == expr 
 
 -- Test for programs
+-- We will recieve arrays containing at least one element of statements. 
+--This will be equvalent to a program.
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
 
