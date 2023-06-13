@@ -21,6 +21,12 @@ import Debug.Trace
 -- QuickCheck data types
 -----------------------------------------------------------------------------
 
+-- New type, where we make sure lists contain at least one element
+data NonEmptyList a = NonEmptyList [a]
+    deriving (Show)
+
+instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
+    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
 
 data NonNegative = NonNeg Integer deriving (Eq, Show)
 
@@ -34,64 +40,6 @@ instance QC.Arbitrary NonNegative where
 instance QC.Arbitrary Positive where
     arbitrary = Pos <$> (QC.getPositive <$> QC.arbitrary) 
 
-
-instance QC.Arbitrary Stmt where
-    arbitrary = FunDecl <$> name <*> args <*> expr
-        where
-            name = gen_name
-            args = QC.arbitrary
-            expr = QC.arbitrary
-
-instance QC.Arbitrary Arg where
-    arbitrary = QC.oneof [VarArg <$> gen_identifier, IntArg . gen_integer <$> QC.arbitrary]
-
-instance QC.Arbitrary Expr where
-    arbitrary = QC.sized expr 
-        where 
-            expr 0 = QC.oneof [Fixed . gen_integer <$> QC.arbitrary, Var <$> gen_identifier]
-            expr n = QC.oneof [
-                Add <$> next_expr <*> next_expr,
-                Sub <$> next_expr <*> next_expr,
-                Mult <$> next_expr <*> next_expr,
-                Fixed . gen_integer <$> QC.arbitrary,
-                Var <$> gen_identifier,
-                Cond <$> next_Pred <*> next_expr <*> next_expr,
-                FunCall <$> gen_name <*> QC.listOf next_expr]
-                where 
-                    next_expr = expr (n `div` 2)
-                    next_Pred = (,,) <$> next_expr <*> QC.arbitrary <*> next_expr
-
-instance QC.Arbitrary PredOp where
-    arbitrary = QC.oneof [
-        pure Less,
-        pure Eq,
-        pure More]
-
-gen_name :: QC.Gen String
-gen_name = QC.vectorOf 3 $ QC.elements "fghk"
-
-gen_identifier :: QC.Gen String
-gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
-
-gen_integer :: Positive -> Integer
-gen_integer (Pos n) = n
-
--- prop_expr :: Expr -> Bool
--- prop_expr expr = compile (pretty expr) == expr 
-
-prop_prog :: QC.Property
-prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
-
-prog :: NonEmptyList Stmt -> Bool
-prog (NonEmptyList prog) = compile (pretty prog) == prog
-
-
-newtype NonEmptyList a = NonEmptyList [a]
-    deriving (Show)
-
-instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
-    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
-
 -- Generates statements
 instance QC.Arbitrary Stmt where
     arbitrary = FunDecl <$> name <*> args <*> expr
@@ -102,13 +50,15 @@ instance QC.Arbitrary Stmt where
 
 -- Generates a random argument
 instance QC.Arbitrary Arg where
-    arbitrary = QC.oneof [VarArg <$> gen_identifier, IntArg . gen_integer <$> QC.arbitrary]
+    arbitrary = QC.oneof [VarArg <$> gen_identifier, IntArg . gen_integer 
+                <$> QC.arbitrary]
 
 -- Generates a random expression but with a constraint
 instance QC.Arbitrary Expr where
     arbitrary = QC.sized expr 
         where 
-            expr 0 = QC.oneof [Fixed . gen_integer <$> QC.arbitrary, Var <$> gen_identifier]
+            expr 0 = QC.oneof [Fixed . gen_integer <$> QC.arbitrary, 
+                    Var <$> gen_identifier]
             expr n = QC.oneof [
                 Add <$> next_expr <*> next_expr,
                 Sub <$> next_expr <*> next_expr,
@@ -121,24 +71,30 @@ instance QC.Arbitrary Expr where
                     next_expr = expr (n `div` 100)
                     next_Pred = (,,) <$> next_expr <*> QC.arbitrary <*> next_expr
 
+-- Generates a random predicate operator
 instance QC.Arbitrary PredOp where
     arbitrary = QC.oneof [
         pure Less,
         pure Eq,
         pure More]
 
+-- Generates a random name of length 3 which contains "fghk" for the function 
 gen_name :: QC.Gen String
 gen_name = QC.vectorOf 3 $ QC.elements "fghk"
 
+-- Generates a random identifier of length 3 which contains "abcde" 
 gen_identifier :: QC.Gen String
 gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
 
+-- Generates a random positive integer
 gen_integer :: Positive -> Integer
 gen_integer (Pos n) = n
 
+-- Test for expressions
 prop_expr :: Expr -> Bool
-prop_expr expr = p (pretty expr) == expr 
+prop_expr expr = compileParser expression (pretty expr) == expr 
 
+-- Test for programs
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
 
@@ -146,11 +102,6 @@ prog :: NonEmptyList Stmt -> Bool
 prog (NonEmptyList prog) = compile (pretty prog) == prog
 
 
-newtype NonEmptyList a = NonEmptyList [a]
-    deriving (Show)
-
-instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
-    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
 -----------------------------------------------------------------------------
 -- FP3.1
 -----------------------------------------------------------------------------
@@ -490,7 +441,7 @@ argument =  (IntArg <$> integer)
         <|> (VarArg <$> identifier)
 
 expression :: Parser Expr
-expression = (whitespace $ term `chain` op) <?> "'expression'"
+expression = (whitespace $ term `chain` op)
     where op = (Add <$ symbol "+")
            <|> (Sub <$ symbol "-")
 
