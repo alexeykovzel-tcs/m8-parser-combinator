@@ -20,27 +20,32 @@ data Parser a = P {
     parse :: Stream -> ErrorHandler Scanner [(a, Stream)]
 }
 
--- Parser has an error handler which returns an output if everything
--- was parsed correctly, otherwise a Scanner with row and column were error happened
-data ErrorHandler a b = ParseError a | Result b deriving Show
+-- Parser has an error handler which returns an output 
+-- if everything was parsed correctly, otherwise a Scanner 
+-- with row and column were error happened
+data ErrorHandler a b 
+    = ParseError a | Result b 
+    deriving Show
 
 -----------------------------------------------------------------------------
 -- FP5.1
 -----------------------------------------------------------------------------
 
--- Position scanner where parse error occurs
 type Row = Int
 type Column = Int
-data Scanner = Position String Row Column deriving (Eq, Ord)
+
+-- Position scanner where parse error occurs
+data Scanner 
+    = Position String Row Column 
+    deriving (Eq, Ord)
 
 instance Show Scanner where
-    show (Position _str row column) = show row ++ ":" ++ show column
+    show (Position _str row column) 
+        = show row ++ ":" ++ show column
 
 -- Initializes a scanner
 initScanner :: Scanner
 initScanner = Position "" 1 1
-
-initScannerEx = initScanner
 
 -- Updates a scanner line and column position depends on the char
 updateScanner :: Scanner -> Char -> Scanner
@@ -48,8 +53,6 @@ updateScanner (Position str row column) c
     | c == '\n' = Position str (row+1) 1
     | c == '\t' = Position str row (column + 8 - ((column-1) `mod` 8))
     | otherwise = Position str row (column + 1)
-
-updateScannerEx = updateScanner initScanner '\n'
 
 -- Error generator
 (<?>) :: Parser a -> String -> Parser a
@@ -61,6 +64,9 @@ p <?> str = P (\(Stream xs s) ->
             ++ ", expected " ++ str
     )
 
+-- Examples:
+initScannerEx = initScanner
+updateScannerEx = updateScanner initScanner '\n'
 errorGenEx = parse ((char 'a') <?> "'a'") $ Stream "bac" initScanner
 
 -----------------------------------------------------------------------------
@@ -75,6 +81,7 @@ instance Functor Parser where
             ParseError e -> ParseError e
         )
 
+-- Example:
 fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ Stream "abc" initScanner
 
 -----------------------------------------------------------------------------
@@ -89,12 +96,12 @@ charIf pred = P p
             | pred x = Result [(x, Stream xs $ updateScanner s x)]
             | otherwise = ParseError s
 
-charIfEx = parse (charIf (\x -> x == 'b')) $ Stream "bbc" initScanner
-
 -- Parses a predefined char
 char :: Char -> Parser Char
 char x = charIf (\y -> x == y)
 
+-- Examples:
+charIfEx = parse (charIf (\x -> x == 'b')) $ Stream "bbc" initScanner
 charEx = parse (char 'b') $ Stream "bbc" initScanner
 
 -----------------------------------------------------------------------------
@@ -105,6 +112,7 @@ charEx = parse (char 'b') $ Stream "bbc" initScanner
 failure :: Parser a
 failure = P (\_ -> ParseError initScanner)
 
+-- Example:
 failureEx = parse (failure) $ Stream "abc" initScanner
 
 -----------------------------------------------------------------------------
@@ -119,6 +127,7 @@ instance Applicative Parser where
             Result [(a, str)] -> parse (a <$> p2) str
         )
 
+-- Examples:
 pureEx = parse (pure 42) $ Stream "123" initScanner
 appEx = parse ((,) <$> char 'a' <*> char 'a') $ Stream "aac" initScanner
 
@@ -136,6 +145,7 @@ instance Alternative Parser where
             Result r -> Result r
         )
 
+-- Examples:
 emptyEx = parse (empty) $ Stream "abc" initScanner
 someEx = parse (some (char 'a')) $ Stream "aaabc" initScanner
 manyEx = parse (many (char 'a')) $ Stream "bc" initScanner
