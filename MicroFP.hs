@@ -18,8 +18,8 @@ import Data.List
 
 -----------------------------------------------------------------------------
 -- FP5.6
--- FP5.6
 -----------------------------------------------------------------------------
+
 -- The following declarations are used to define the EDSL as an instance of Arbitrary.
 -- Two QuickCheck test are defined. They are ran once you run the "check command".
 
@@ -31,8 +31,6 @@ data NonEmptyList a = NonEmptyList [a] deriving (Show)
 data NonNegative = NonNeg Integer deriving (Eq, Show)
 
 data Positive = Pos Integer deriving (Eq, Show)
-
--- EDSL as an instance of Arbitrary
 
 -- Generates non-negative integers
 instance QC.Arbitrary NonNegative where
@@ -104,6 +102,7 @@ genInteger (Pos n) = n
 prop_expr :: Expr -> Bool
 prop_expr expr = compileWith expression (pretty expr) == expr 
 
+-- Test for programs
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) 
     $ \(NonEmptyList prog) -> compile (pretty prog) == prog
