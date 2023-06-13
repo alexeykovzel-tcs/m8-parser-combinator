@@ -97,11 +97,11 @@ genIdentifier = QC.vectorOf 3 $ QC.elements "abcde"
 genInteger :: Positive -> Integer
 genInteger (Pos n) = n
 
--- Generator tests
+-- Test random expressions
 prop_expr :: Expr -> Bool
 prop_expr expr = compileWith expression (pretty expr) == expr 
 
--- We generate arrays of random 
+-- Test random programs
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 5 QC.arbitrary) 
     $ \(NonEmptyList prog) -> compile (pretty prog) == prog
@@ -204,7 +204,11 @@ prog_comb = [
 -----------------------------------------------------------------------------
 
 -- Pretty printer that generates a textual representation 
--- that corresponds to the grammar of µFP. 
+-- that corresponds to the grammar of µFP.
+
+-- Examples of usage
+prettySumEx = pretty prog_sum
+prettyFibEx = pretty prog_fib
 
 class Pretty a where
     pretty :: a -> String 
@@ -261,7 +265,10 @@ prettyJoin s1 sep s2 = pretty s1 ++ sep ++ pretty s2
 
 -- Partial application is implemented by preprocessing the program
 -- before evaluation and adding "ghost" arguments to complete 
--- partially applied functions
+-- partially applied functions.
+
+-- Examples of usage
+preEvalEx = preEval $ compile "add a b := a + b; inc := add (1);"
 
 preEval :: Prog -> Prog
 preEval prog = prePartial [] prog
@@ -313,6 +320,11 @@ arity ((FunDecl name args _):xs) id
 
 -- Evaluator for µFP EDSL with support for pattern matching
 -- and higher order functions.
+
+-- Examples of usage
+fibEx = eval prog_fib  "fib" [10]
+sumEx = eval prog_sum  "sum" [15]
+addEx = eval prog_comb "add" [5, 7]
 
 -- Context contains variables and the program itself (text)
 data Context = Ctx { vars :: LUT, text :: Prog }
@@ -418,7 +430,9 @@ funMatch args vals
             (Int y) -> x == y
             _       -> False
 
+-----------------------------------------------------------------------------
 -- Testing evaluator on functions from "functions.txt"
+
 prop_eval_fibonacci :: Bool
 prop_eval_fibonacci = eval prog_fibonacci "fibonacci" [10] == 55
 
@@ -448,6 +462,11 @@ test_sum n = n + (test_sum $ n - 1)
 -- FP4.1 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
+-- Examples of usage
+programEx = parse program $ stream "f := 2 + 2;"
+expressionEx = parse expression $ stream "2 + 2 * 3"
+
+-- Parser for µFP EDSL
 program :: Parser Prog
 program = some statement <?> "function name"
 
@@ -486,8 +505,11 @@ funCall = FunCall
 condition :: Parser Expr
 condition = Cond
     <$ symbol "if" <*> parens predicate
-    <* (symbol "then" <?> "'then'") <*> braces (expression <?> "expression in 'if'")
-    <* (symbol "else" <?> "'else'") <*> braces (expression <?> "expression in 'else'")
+    <* (symbol "then" <?> "'then'") <*> braces ifExpr
+    <* (symbol "else" <?> "'else'") <*> braces elseExpr
+    where
+        ifExpr   = expression <?> "expression in 'if'"
+        elseExpr = expression <?> "expression in 'else'"
 
 predicate :: Parser Pred
 predicate = (,,)
@@ -512,6 +534,9 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
 -- FP4.2 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
+-- Examples of usage
+compileEx = compile "f := 2 + n; g := 3; "
+
 -- Compiles a µFP program
 compile :: String -> Prog
 compile code = compileWith program code
@@ -533,6 +558,9 @@ prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
 -----------------------------------------------------------------------------
 -- FP4.3 (Author: Aliaksei)
 -----------------------------------------------------------------------------
+
+-- Examples of usage
+runFileEx = runFile "functions.txt" []
 
 -- Reads the specified file, compiles and evaluates it.
 -- When the file contains multiple functions, the last one is used
