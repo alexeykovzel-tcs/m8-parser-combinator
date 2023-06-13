@@ -35,6 +35,11 @@ lowerEx = parse lower $ stream "bbc"
 upperEx = parse upper $ stream "Bbc"
 digEx = parse dig $ stream "5ac"
 
+prop_letterEx = getResult letterEx == 'b'
+prop_lowerEx = getResult lowerEx == 'b'
+prop_upperEx = getResult upperEx == 'B'
+prop_digEx = getResult digEx == '5'
+
 -----------------------------------------------------------------------------
 -- FP2.2
 -----------------------------------------------------------------------------
@@ -57,6 +62,10 @@ whitespaceEx = parse (whitespace dig) $ stream " 1 "
 betweenEx = parse (between (char '(') dig (char ')')) $ stream "(1)"
 oneOfEx = parse (oneOf "abc") $ stream "cde"
 
+prop_whitespaceEx = getResult whitespaceEx == '1'
+prop_betweenEx = getResult betweenEx == '1'
+prop_oneOfEx = getResult oneOfEx == 'c'
+
 -----------------------------------------------------------------------------
 -- FP2.3
 -----------------------------------------------------------------------------
@@ -74,9 +83,13 @@ option :: a -> Parser a -> Parser a
 option x p = p <|> pure x
 
 -- Examples of usage
-sep1Ex = parse (sep (char 'a') (char ',')) $ stream "a,a,a"
-sepEx = parse (sep (char 'a') (char ',')) $ stream "b,b,b"
+sep1Ex = parse (sep1 (char 'a') (char ',')) $ stream "a,a,a"
+sepEx = parse (sep (char 'a') (char ',')) $ stream ""
 optionEx = parse (option 'x' (char 'a')) $ stream "xabc"
+
+prop_sep1Ex = getResult sep1Ex == "aaa"
+prop_sepEx = getResult sepEx == ""
+prop_optionEx = getResult optionEx == 'x'
 
 -----------------------------------------------------------------------------
 -- FP2.4
@@ -113,3 +126,10 @@ integerEx = parse integer                        $ stream "100 years old he was"
 symbolEx = parse (symbol "once he looked")       $ stream "once he looked in the mirror"
 parensEx = parse (parens $ string "Wow!")        $ stream "(Wow!) - he was shocked"
 bracesEx = parse (braces $ string "haskell0ver") $ stream "{haskell0ver} he saw in the mirror"
+
+prop_stringEx = getResult stringEx == "There was"
+prop_identifierEx = getResult identifierEx == "rev0l"
+prop_integerEx = getResult integerEx == 100
+prop_symbolEx = getResult symbolEx == "once he looked"
+prop_parensEx = getResult parensEx == "Wow!"
+prop_bracesEx = getResult bracesEx == "haskell0ver"

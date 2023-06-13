@@ -2,7 +2,10 @@
 -- Student 2: Denis Krylov (s2808757)
 -- Student 3: Serkan Akin (s2727218)
 
+-- Required for QuickCheck
 {-# LANGUAGE TemplateHaskell #-}
+
+-- Required for Pretty instances
 {-# LANGUAGE FlexibleInstances #-}
 
 module MicroFP where
@@ -518,8 +521,7 @@ compile code = compileWith program code
 
 -- Parses a textual representation of µFP to EDSL
 compileWith :: Parser a -> String -> a
-compileWith parser code = fst $ head 
-    $ (\(Result r) -> r) 
+compileWith parser code = getResult 
     $ parse parser
     $ Stream code initScanner
 
@@ -599,14 +601,6 @@ prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
 prop_eval_patmatch_sum = eval (patmatch prog_sum)  "sum" [8] == 36
 
 -----------------------------------------------------------------------------
--- Utils
------------------------------------------------------------------------------
-
--- Joins strings using a separator
--- e.g. join ", " ["Hi", "John"] = "Hi, John"
-join :: String -> [String] -> String
-join _ [x]      = x
-join sep (x:xs) = x ++ sep ++ (join sep xs)
 
 -- Runs all tests
 return []
