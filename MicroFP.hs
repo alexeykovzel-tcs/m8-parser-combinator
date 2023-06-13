@@ -15,11 +15,13 @@ import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
 import Data.Char
 import Data.List
-import Debug.Trace
 
 -----------------------------------------------------------------------------
 -- FP5.6
+-- FP5.6
 -----------------------------------------------------------------------------
+-- The following declarations are used to define the EDSL as an instance of Arbitrary.
+-- Two QuickCheck test are defined. They are ran once you run the "check command".
 
 -- The following code generates random programs as well as 
 -- contains QuickCheck helpers used throughout the file
@@ -29,6 +31,8 @@ data NonEmptyList a = NonEmptyList [a] deriving (Show)
 data NonNegative = NonNeg Integer deriving (Eq, Show)
 
 data Positive = Pos Integer deriving (Eq, Show)
+
+-- EDSL as an instance of Arbitrary
 
 -- Generates non-negative integers
 instance QC.Arbitrary NonNegative where
