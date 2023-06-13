@@ -31,6 +31,8 @@ data NonNegative = NonNeg Integer deriving (Eq, Show)
 
 data Positive = Pos Integer deriving (Eq, Show)
 
+data SmallNumber = SmallNum Integer deriving (Eq, Show)
+
 -- Generates non-negative integers
 instance QC.Arbitrary NonNegative where
     arbitrary = NonNeg <$> (abs <$> QC.arbitrary)
@@ -42,6 +44,10 @@ instance QC.Arbitrary Positive where
 -- Generates non-empty lists
 instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
     arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
+
+-- Generatates a not too large integer 
+instance QC.Arbitrary SmallNumber where 
+    arbitrary = SmallNum <$> QC.choose (1, 15)
 
 -- Generates statements
 instance QC.Arbitrary Stmt where
@@ -79,7 +85,7 @@ instance QC.Arbitrary Expr where
                     FunCall <$> genName <*> QC.listOf nextExpr
                 ]
                 where 
-                    nextExpr = expr (n `div`80)
+                    nextExpr = expr (n `div`100)
                     nextPred = (,,) 
                         <$> nextExpr 
                         <*> QC.arbitrary 
@@ -596,7 +602,21 @@ varProg ((FunDecl _ ((IntArg _):_) _):fs) = varProg fs
 
 -- Tests for fibonacci and sum with "patmatch"
 prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
-prop_eval_patmatch_sum = eval (patmatch prog_sum)  "sum" [8] == 36
+prop_patmatch_sum :: NonNegative -> Bool
+prop_patmatch_sum (NonNeg a) = eval (patmatch prog_sum) "sum" [a] == test_sum a
+
+prop_patmatch_fibonacci :: SmallNumber -> Bool
+prop_patmatch_fibonacci (SmallNum a) = eval (patmatch prog_fibonacci) "fibonacci" [a] 
+                                        == eval prog_fibonacci "fibonacci" [a]
+
+-- Test for fib and twice. Shows that functions 
+--with pattern matching are unchanged
+prop_patmatch_fib :: Bool
+prop_patmatch_fib = patmatch prog_fib == prog_fib
+
+prop_patmatch_twice :: Bool
+prop_patmatch_twice = patmatch prog_twice == prog_twice
+
 
 -----------------------------------------------------------------------------
 -- Utils
