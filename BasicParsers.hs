@@ -10,7 +10,7 @@ import Test.QuickCheck
 import PComb
 
 -----------------------------------------------------------------------------
--- FP2.1
+-- FP2.1 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a letter
@@ -41,7 +41,7 @@ prop_upperEx = getResult upperEx == 'B'
 prop_digEx = getResult digEx == '5'
 
 -----------------------------------------------------------------------------
--- FP2.2
+-- FP2.2 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parsers whitespace characters around another parser
@@ -67,7 +67,7 @@ prop_betweenEx = getResult betweenEx == '1'
 prop_oneOfEx = getResult oneOfEx == 'c'
 
 -----------------------------------------------------------------------------
--- FP2.3
+-- FP2.3 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses one or more occurrences of p, separated by s
@@ -92,7 +92,7 @@ prop_sepEx = getResult sepEx == ""
 prop_optionEx = getResult optionEx == 'x'
 
 -----------------------------------------------------------------------------
--- FP2.4
+-- FP2.4 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a given string, similar to the function char

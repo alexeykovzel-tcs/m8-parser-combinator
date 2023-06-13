@@ -8,7 +8,7 @@ import Data.Char
 import Test.QuickCheck
 
 -----------------------------------------------------------------------------
--- FP1.1
+-- FP1.1 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parser accepts a stream of chars and returns the parsed entity
@@ -35,7 +35,7 @@ stream :: String -> Stream
 stream x = Stream x initScanner
 
 -----------------------------------------------------------------------------
--- FP5.1
+-- FP5.1 (Author: Denis)
 -----------------------------------------------------------------------------
 
 -- Error generator for parsers
@@ -75,7 +75,7 @@ prop_initScanner = show initScanner == "1:1"
 prop_updateScanner = show updateScannerEx == "2:1"
 
 -----------------------------------------------------------------------------
--- FP1.2
+-- FP1.2 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Applies a function to the parsed value
@@ -91,7 +91,7 @@ fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ stream "abc"
 prop_fmapEx = getResult fmapEx == ('a','b')
 
 -----------------------------------------------------------------------------
--- FP1.3
+-- FP1.3 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a char if predicate on it returns true
@@ -114,7 +114,7 @@ prop_charEx = getResult charEx == 'b'
 prop_charIfEx = getResult charIfEx == 'b'
 
 -----------------------------------------------------------------------------
--- FP1.4
+-- FP1.4 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parser that always fails
@@ -125,7 +125,7 @@ failure = P (\_ -> ParseError initScanner)
 failureEx = parse failure $ stream "abc"
 
 -----------------------------------------------------------------------------
--- FP1.5
+-- FP1.5 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Applies a function within a Parser context
@@ -144,7 +144,7 @@ prop_pureEx = getResult pureEx == 42
 prop_appEx = getResult appEx == ('a','a')
 
 -----------------------------------------------------------------------------
--- FP1.6
+-- FP1.6 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 instance Alternative Parser where
