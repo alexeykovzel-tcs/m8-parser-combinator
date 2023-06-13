@@ -449,7 +449,7 @@ test_sum n = n + (test_sum $ n - 1)
 -----------------------------------------------------------------------------
 
 program :: Parser Prog
-program = some statement <?> "'function declaration'"
+program = some statement <?> "'function name'"
 
 statement :: Parser Stmt
 statement = FunDecl
@@ -481,13 +481,13 @@ factor = condition
 funCall :: Parser Expr
 funCall = FunCall
     <$> identifier
-    <*> (parens $ sep expression $ symbol ",")
+    <*> (parens $ sep (expression) (symbol ","))
 
 condition :: Parser Expr
 condition = Cond
     <$ symbol "if" <*> parens predicate
-    <* symbol "then" <*> braces expression
-    <* symbol "else" <*> braces expression
+    <* (symbol "then" <?> "'then'") <*> braces expression
+    <* (symbol "else" <?> "'else'") <*> braces expression
 
 predicate :: Parser Pred
 predicate = (,,)
@@ -500,7 +500,7 @@ predicateOp =
         Eq <$ symbol "=="
     <|>  Less <$ symbol "<"
     <|> More <$ symbol ">" 
-    <?> "operation < or > or =="
+    <?> "'<' or '>' or '=='"
 
 -- Chains expressions like:
 -- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))

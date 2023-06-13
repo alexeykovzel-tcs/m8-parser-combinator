@@ -104,7 +104,7 @@ parens p = between (char '(') p (char ')')
 
 -- Parses something using the provided parser between braces
 braces :: Parser a -> Parser a 
-braces p = between (char '{') p (char '}')
+braces p = between (char '{') p (char '}') <?> "'condition' or 'expression' or 'function call' or 'integer' or 'identifier'"
 
 -- Examples of usage
 stringEx = parse (string "There was")            $ stream "There was a guy"
