@@ -21,7 +21,6 @@ import Debug.Trace
 -- QuickCheck data types
 -----------------------------------------------------------------------------
 
-
 data NonNegative = NonNeg Integer deriving (Eq, Show)
 
 data Positive = Pos Integer deriving (Eq, Show)
@@ -33,64 +32,6 @@ instance QC.Arbitrary NonNegative where
 -- Generates positive integers
 instance QC.Arbitrary Positive where
     arbitrary = Pos <$> (QC.getPositive <$> QC.arbitrary) 
-
-
-instance QC.Arbitrary Stmt where
-    arbitrary = FunDecl <$> name <*> args <*> expr
-        where
-            name = gen_name
-            args = QC.arbitrary
-            expr = QC.arbitrary
-
-instance QC.Arbitrary Arg where
-    arbitrary = QC.oneof [VarArg <$> gen_identifier, IntArg . gen_integer <$> QC.arbitrary]
-
-instance QC.Arbitrary Expr where
-    arbitrary = QC.sized expr 
-        where 
-            expr 0 = QC.oneof [Fixed . gen_integer <$> QC.arbitrary, Var <$> gen_identifier]
-            expr n = QC.oneof [
-                Add <$> next_expr <*> next_expr,
-                Sub <$> next_expr <*> next_expr,
-                Mult <$> next_expr <*> next_expr,
-                Fixed . gen_integer <$> QC.arbitrary,
-                Var <$> gen_identifier,
-                Cond <$> next_Pred <*> next_expr <*> next_expr,
-                FunCall <$> gen_name <*> QC.listOf next_expr]
-                where 
-                    next_expr = expr (n `div` 2)
-                    next_Pred = (,,) <$> next_expr <*> QC.arbitrary <*> next_expr
-
-instance QC.Arbitrary PredOp where
-    arbitrary = QC.oneof [
-        pure Less,
-        pure Eq,
-        pure More]
-
-gen_name :: QC.Gen String
-gen_name = QC.vectorOf 3 $ QC.elements "fghk"
-
-gen_identifier :: QC.Gen String
-gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
-
-gen_integer :: Positive -> Integer
-gen_integer (Pos n) = n
-
--- prop_expr :: Expr -> Bool
--- prop_expr expr = compile (pretty expr) == expr 
-
-prop_prog :: QC.Property
-prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
-
-prog :: NonEmptyList Stmt -> Bool
-prog (NonEmptyList prog) = compile (pretty prog) == prog
-
-
-newtype NonEmptyList a = NonEmptyList [a]
-    deriving (Show)
-
-instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
-    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
 
 -- Generates statements
 instance QC.Arbitrary Stmt where
@@ -136,8 +77,8 @@ gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
 gen_integer :: Positive -> Integer
 gen_integer (Pos n) = n
 
-prop_expr :: Expr -> Bool
-prop_expr expr = p (pretty expr) == expr 
+-- prop_expr :: Expr -> Bool
+-- prop_expr expr = p (pretty expr) == expr 
 
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
@@ -145,12 +86,12 @@ prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
 prog :: NonEmptyList Stmt -> Bool
 prog (NonEmptyList prog) = compile (pretty prog) == prog
 
-
 newtype NonEmptyList a = NonEmptyList [a]
     deriving (Show)
 
 instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
     arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
+
 -----------------------------------------------------------------------------
 -- FP3.1
 -----------------------------------------------------------------------------
