@@ -8,7 +8,7 @@ import Data.Char
 import Test.QuickCheck
 
 -----------------------------------------------------------------------------
--- FP1.1
+-- FP1.1 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parser accepts a stream of chars and returns the parsed entity
@@ -28,14 +28,14 @@ data Stream
 data ParseResult a
     = ParseError Scanner
     | Result [(a, Stream)]
-    deriving Show
+    deriving (Eq, Show)
 
 -- Creates a stream of characters
 stream :: String -> Stream
 stream x = Stream x initScanner
 
 -----------------------------------------------------------------------------
--- FP5.1
+-- FP5.1 (Author: Denis)
 -----------------------------------------------------------------------------
 
 -- Error generator for parsers
@@ -70,10 +70,12 @@ updateScanner (Position row column) c
 -- Examples of usage
 initScannerEx = initScanner
 updateScannerEx = updateScanner initScanner '\n'
-errorGenEx = parse (char 'a' <?> "'a'") $ stream "bac"
+
+prop_initScanner = show initScanner == "1:1"
+prop_updateScanner = show updateScannerEx == "2:1"
 
 -----------------------------------------------------------------------------
--- FP1.2
+-- FP1.2 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Applies a function to the parsed value
@@ -86,8 +88,10 @@ instance Functor Parser where
 -- Examples of usage
 fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ stream "abc"
 
+prop_fmapEx = getResult fmapEx == ('a','b')
+
 -----------------------------------------------------------------------------
--- FP1.3
+-- FP1.3 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a char if predicate on it returns true
@@ -106,8 +110,11 @@ char x = charIf (\y -> x == y)
 charEx = parse (char 'b') $ stream "bbc"
 charIfEx = parse (charIf (\x -> x == 'b')) $ stream "bbc"
 
+prop_charEx = getResult charEx == 'b'
+prop_charIfEx = getResult charIfEx == 'b'
+
 -----------------------------------------------------------------------------
--- FP1.4
+-- FP1.4 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parser that always fails
@@ -118,7 +125,7 @@ failure = P (\_ -> ParseError initScanner)
 failureEx = parse failure $ stream "abc"
 
 -----------------------------------------------------------------------------
--- FP1.5
+-- FP1.5 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Applies a function within a Parser context
@@ -133,8 +140,11 @@ instance Applicative Parser where
 pureEx = parse (pure 42) $ stream "123"
 appEx = parse ((,) <$> char 'a' <*> char 'a') $ stream "aac"
 
+prop_pureEx = getResult pureEx == 42
+prop_appEx = getResult appEx == ('a','a')
+
 -----------------------------------------------------------------------------
--- FP1.6
+-- FP1.6 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 instance Alternative Parser where
@@ -149,3 +159,20 @@ emptyEx = parse empty $ stream "abc"
 someEx = parse (some $ char 'a') $ stream "aaabc"
 manyEx = parse (many $ char 'a') $ stream "bc"
 altEx = parse (char 'a' <|> char 'b') $ stream "bca"
+
+prop_someEx = getResult someEx == "aaa"
+prop_manyEx = getResult manyEx == ""
+prop_altEx = getResult altEx == 'b'
+
+-----------------------------------------------------------------------------
+-- Utilities
+-----------------------------------------------------------------------------
+
+-- Joins strings using a separator
+-- e.g. join ", " ["Hi", "John"] = "Hi, John"
+join :: String -> [String] -> String
+join _ [x]      = x
+join sep (x:xs) = x ++ sep ++ (join sep xs)
+
+getResult :: ParseResult a -> a
+getResult p = fst $ head $ (\(Result r) -> r) p
