@@ -416,7 +416,10 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
 
 -- Parsing a textual representation of µFP to EDSL.
 compile :: String -> Prog
-compile code = fst $ head $ (\(Result r) -> r) $ parse program $ Stream code initScanner
+compile code = fst $ head 
+    $ (\(Result r) -> r) 
+    $ parse program 
+    $ Stream code initScanner
 
 -- Tests for compile
 prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
@@ -424,9 +427,6 @@ prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
 prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
 prop_compile_div  = prog_div  == (compile $ pretty prog_div)
 prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
-
--- Tests for error handling
--- TODO:
 
 -----------------------------------------------------------------------------
 -- FP4.3
@@ -447,11 +447,9 @@ evalLast args prog = eval prog name args
 -- FP5.3
 -----------------------------------------------------------------------------
 
-{- 
-    Function to apply patmatch on each group of function declarations 
-    Constraints: The program can contain multiple with one argument(like prog_sum and prog_fibonacci)
-    however, will fail if the functions are declared in mixed order.
--}
+-- Function to apply patmatch on each group of function declarations 
+-- Constraints: The program can contain multiple with one argument (e.g. prog_sum)
+-- however, will fail if the functions are declared in mixed order.
 patmatch :: Prog -> Prog
 patmatch prog = concatMap patmatchFunc (groupFuncs prog)
 
@@ -465,13 +463,16 @@ groupFuncs = groupBy sameFunDecl . sortOn funDeclName
 -- Gets a program and returns a program in if-else form (Cond)
 patmatchFunc :: Prog -> Prog
 patmatchFunc ((FunDecl name [] expr):fs) 
-       = [(FunDecl name [VarArg $ ""] expr)]
+           = [(FunDecl name [VarArg ""] expr)]
+
 patmatchFunc ((FunDecl name [(VarArg x)] expr):fs) 
-       = [(FunDecl name [VarArg $ x] expr)]
+           = [(FunDecl name [VarArg x] expr)]
+
 patmatchFunc ((FunDecl name (x:y:xs) expr):fs) 
-       = [(FunDecl name (x:y:xs) expr)]
+           = [(FunDecl name (x:y:xs) expr)]
+
 patmatchFunc ((FunDecl name ((IntArg x):_) expr):fs) 
-       = [(FunDecl name [VarArg var] cond)]
+           = [(FunDecl name [VarArg var] cond)]
     where
         cond = Cond pred expr (matchRest fs)
         pred = (Var var, Eq, Fixed x)
