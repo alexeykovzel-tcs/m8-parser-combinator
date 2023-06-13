@@ -131,7 +131,9 @@ instance Pretty Prog where
 instance Pretty Stmt where
     pretty (FunDecl id args expr)
         = unwords [id, prettyArgs, ":=", pretty expr, ";"]
-        where prettyArgs = unwords $ map pretty args
+        where prettyArgs
+                | length args == 0 = ""
+                | otherwise = unwords $ map pretty args
 
 instance Pretty Arg where
     pretty (IntArg x) = show x
@@ -151,7 +153,9 @@ instance Pretty Expr where
 
     pretty (FunCall id args) 
         = id ++ " (" ++ prettyArgs ++ ")"
-        where prettyArgs = join ", " $ map pretty args
+        where prettyArgs
+                | length args == 0 = ""
+                | otherwise = join ", " $ map pretty args
 
 instance Pretty Pred where
     pretty (e1, op, e2) = prettyJoin e1 (pretty op) e2
@@ -416,9 +420,12 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
 
 -- Parsing a textual representation of µFP to EDSL.
 compile :: String -> Prog
-compile code = fst $ head 
+compile code = compileParser program code
+
+compileParser :: Parser a -> String -> a
+compileParser parser code = fst $ head 
     $ (\(Result r) -> r) 
-    $ parse program 
+    $ parse parser
     $ Stream code initScanner
 
 -- Tests for compile

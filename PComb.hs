@@ -55,8 +55,10 @@ updateScannerEx = updateScanner initScanner '\n'
 (<?>) :: Parser a -> String -> Parser a
 p <?> str = P (\(Stream xs s) ->
     case (parse p (Stream xs s)) of
-        ParseError s -> error $ "Parse error at " ++ show s ++ ", expected " ++ str
         Result r -> Result r
+        ParseError s -> error 
+            $ "Parse error at " ++ show s 
+            ++ ", expected " ++ str
     )
 
 errorGenEx = parse ((char 'a') <?> "'a'") $ Stream "bac" initScanner
@@ -69,8 +71,8 @@ errorGenEx = parse ((char 'a') <?> "'a'") $ Stream "bac" initScanner
 instance Functor Parser where
     fmap f (P p) = P (\xs -> 
         case (p xs) of
-            ParseError e -> ParseError e
             Result r -> Result [(f a, ys) | (a, ys) <- r]
+            ParseError e -> ParseError e
         )
 
 fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ Stream "abc" initScanner
