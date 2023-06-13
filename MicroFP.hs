@@ -18,8 +18,13 @@ import Data.List
 import Debug.Trace
 
 -----------------------------------------------------------------------------
--- QuickCheck data types
+-- FP5.6
 -----------------------------------------------------------------------------
+
+-- The following code generates random programs as well as 
+-- contains QuickCheck helpers used throughout the file
+
+data NonEmptyList a = NonEmptyList [a] deriving (Show)
 
 data NonNegative = NonNeg Integer deriving (Eq, Show)
 
@@ -33,64 +38,68 @@ instance QC.Arbitrary NonNegative where
 instance QC.Arbitrary Positive where
     arbitrary = Pos <$> (QC.getPositive <$> QC.arbitrary) 
 
+-- Generates non-empty lists
+instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
+    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
+
 -- Generates statements
 instance QC.Arbitrary Stmt where
-    arbitrary = FunDecl <$> name <*> args <*> expr
-        where
-            name = gen_name
-            args = QC.arbitrary
-            expr = QC.arbitrary
+    arbitrary = FunDecl 
+        <$> genName         -- function name
+        <*> QC.arbitrary    -- arguments
+        <*> QC.arbitrary    -- expression
 
 -- Generates a random argument
 instance QC.Arbitrary Arg where
-    arbitrary = QC.oneof [VarArg <$> gen_identifier, IntArg . gen_integer <$> QC.arbitrary]
+    arbitrary = QC.oneof [
+            VarArg <$> genIdentifier, 
+            IntArg . genInteger <$> QC.arbitrary 
+        ]
+
+-- Generates a predicate operator
+instance QC.Arbitrary PredOp where
+    arbitrary = QC.oneof [pure Less, pure Eq, pure More]
 
 -- Generates a random expression but with a constraint
 instance QC.Arbitrary Expr where
     arbitrary = QC.sized expr 
         where 
-            expr 0 = QC.oneof [Fixed . gen_integer <$> QC.arbitrary, Var <$> gen_identifier]
+            expr 0 = QC.oneof [
+                    Fixed . genInteger <$> QC.arbitrary, 
+                    Var <$> genIdentifier
+                ]
             expr n = QC.oneof [
-                Add <$> next_expr <*> next_expr,
-                Sub <$> next_expr <*> next_expr,
-                Mult <$> next_expr <*> next_expr,
-                Fixed . gen_integer <$> QC.arbitrary,
-                Var <$> gen_identifier,
-                Cond <$> next_Pred <*> next_expr <*> next_expr,
-                FunCall <$> gen_name <*> QC.listOf next_expr]
+                    Add <$> nextExpr <*> nextExpr,
+                    Sub <$> nextExpr <*> nextExpr,
+                    Mult <$> nextExpr <*> nextExpr,
+                    Fixed . genInteger <$> QC.arbitrary,
+                    Var <$> genIdentifier,
+                    Cond <$> nextPred <*> nextExpr <*> nextExpr,
+                    FunCall <$> genName <*> QC.listOf nextExpr
+                ]
                 where 
-                    next_expr = expr (n `div` 100)
-                    next_Pred = (,,) <$> next_expr <*> QC.arbitrary <*> next_expr
+                    nextExpr = expr (n `div` 100)
+                    nextPred = (,,) 
+                        <$> nextExpr 
+                        <*> QC.arbitrary 
+                        <*> nextExpr
 
-instance QC.Arbitrary PredOp where
-    arbitrary = QC.oneof [
-        pure Less,
-        pure Eq,
-        pure More]
+-- Generates a name with length 3
+genName :: QC.Gen String
+genName = QC.vectorOf 3 $ QC.elements "fghk"
 
-gen_name :: QC.Gen String
-gen_name = QC.vectorOf 3 $ QC.elements "fghk"
+-- Generates an identifier with length 3
+genIdentifier :: QC.Gen String
+genIdentifier = QC.vectorOf 3 $ QC.elements "abcde"
 
-gen_identifier :: QC.Gen String
-gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
+-- Generates a positive integer
+genInteger :: Positive -> Integer
+genInteger (Pos n) = n
 
-gen_integer :: Positive -> Integer
-gen_integer (Pos n) = n
-
--- prop_expr :: Expr -> Bool
--- prop_expr expr = p (pretty expr) == expr 
-
+-- Tests that a generated program can be compiled
 prop_prog :: QC.Property
-prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
-
-prog :: NonEmptyList Stmt -> Bool
-prog (NonEmptyList prog) = compile (pretty prog) == prog
-
-newtype NonEmptyList a = NonEmptyList [a]
-    deriving (Show)
-
-instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
-    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
+prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) 
+    $ \(NonEmptyList prog) -> compile (pretty prog) == prog
 
 -----------------------------------------------------------------------------
 -- FP3.1
@@ -133,6 +142,8 @@ data PredOp
 -- The following functions in µFP EDSL correspond 
 -- to the definitions in functions.txt.
 
+-- Program that calculates a fibonacci number
+-- (uses pattern matching)
 prog_fibonacci :: Prog
 prog_fibonacci = [
     FunDecl "fibonacci" [IntArg 0] (Fixed 0),
@@ -142,6 +153,7 @@ prog_fibonacci = [
         addL = FunCall "fibonacci" [Sub (Var "n") (Fixed 1)]
         addR = FunCall "fibonacci" [Sub (Var "n") (Fixed 2)]
 
+-- Program that calculates a fibonacci number
 prog_fib :: Prog
 prog_fib = [ FunDecl "fib" [VarArg "n"] body ]
     where
@@ -150,6 +162,8 @@ prog_fib = [ FunDecl "fib" [VarArg "n"] body ]
         addL = FunCall "fib" [Sub (Var "n") (Fixed 1)]
         addR = FunCall "fib" [Sub (Var "n") (Fixed 2)]
 
+-- Program that calculates a sum of integers from 1 to "a"
+-- (uses pattern matching)
 prog_sum :: Prog
 prog_sum = [ 
     FunDecl "sum" [IntArg 0] (Fixed 0),
@@ -157,6 +171,7 @@ prog_sum = [
     where 
         recSum = FunCall "sum" [Sub (Var "a") (Fixed 1)]
 
+-- Program that calculates div on two integers
 prog_div :: Prog
 prog_div = [ FunDecl "div" [VarArg "x", VarArg "y"] body ]
     where
@@ -164,11 +179,15 @@ prog_div = [ FunDecl "div" [VarArg "x", VarArg "y"] body ]
         pred = (Var "x", Less, Var "y")
         body = (Cond pred (Fixed 0) (Add (Fixed 1) divcall))
 
+-- Program that applies a function twice passed as argument
+-- (it is a higher order function) 
 prog_twice :: Prog
 prog_twice = [ 
     FunDecl "twice" [VarArg "f", VarArg "x"] 
     (FunCall "f" [FunCall "f" [Var "x"]]) ]
 
+-- Program that calculates "11" 
+-- using partially applied functions 
 prog_comb :: Prog
 prog_comb = [
     FunDecl "add" [VarArg "x", VarArg "y"] (Add (Var "x") (Var "y")),
@@ -202,7 +221,7 @@ instance Pretty Arg where
 instance Pretty Expr where
     pretty (Fixed  x) = show x
     pretty (Var    x) = x
-    pretty (Add  x y) = "(" ++ prettyJoin x " + " y ++ ")"  -- added parantheses
+    pretty (Add  x y) = "(" ++ prettyJoin x " + " y ++ ")"
     pretty (Sub  x y) = "(" ++ prettyJoin x " - " y ++ ")" 
     pretty (Mult x y) = "(" ++ prettyJoin x " * " y ++ ")" 
 
@@ -235,8 +254,10 @@ prettyJoin s1 sep s2 = pretty s1 ++ sep ++ pretty s2
 -- FP5.4 (partial application)
 -----------------------------------------------------------------------------
 
--- Program preprocessing before evaluation
--- (e.g. support for partial application)
+-- Partial application is implemented by preprocessing the program
+-- before evaluation and adding "ghost" arguments to complete 
+-- partially applied functions
+
 preEval :: Prog -> Prog
 preEval prog = prePartial [] prog
 
@@ -247,14 +268,14 @@ prePartial prog (x:xs) = y : prePartial (y:prog) xs
     where y = preStmt prog x
 
 -- If a function has a function call as its expression,
--- then add missing arguments if it is partially applied
+-- then add "ghost" arguments if it is partially applied
 preStmt :: Prog -> Stmt -> Stmt
 preStmt prog decl@(FunDecl name args (FunCall id vals))
     | not (isArg id args) && valsLeft /= 0 = fullDecl
     | otherwise = decl
     where 
         valsLeft  = arity prog id - length vals
-        ghostArgs = genArgs valsLeft
+        ghostArgs = genGhost valsLeft
         fullArgs  = args ++ (VarArg <$> ghostArgs)
         fullVals  = vals ++ (Var <$> ghostArgs)
         fullDecl  = FunDecl name fullArgs (FunCall id fullVals)
@@ -269,11 +290,10 @@ isArg id ((IntArg _):xs) = isArg id xs
 isArg id ((VarArg name):xs) = id == name || isArg id xs
 isArg id [] = False
 
--- Generates missing arguments for 
--- a partially applied function
-genArgs :: Int -> [String]
-genArgs 0 = []
-genArgs num = ("_" ++ show num) : genArgs (num - 1)
+-- Generates "ghost" arguments for a partially applied function
+genGhost :: Int -> [String]
+genGhost 0 = []
+genGhost num = ("_" ++ show num) : genGhost (num - 1)
 
 -- Gets function arity by its name
 arity :: Prog -> String -> Int
@@ -283,21 +303,26 @@ arity ((FunDecl name args _):xs) id
     | otherwise  = arity xs id
 
 -----------------------------------------------------------------------------
--- FP3.4 ; FP5.2 ; FP5.5
+-- FP3.4 -- FP5.2 -- FP5.5
 -----------------------------------------------------------------------------
 
--- Context contains variables and the program itself
+-- Evaluator for µFP EDSL with support for pattern matching
+-- and higher order functions.
+
+-- Context contains variables and the program itself (text)
 data Context = Ctx { vars :: LUT, text :: Prog }
 
 -- Look-up table that contains variable values
 type LUT = [(String, Val)]
 
+-- Variable values
 data Val
-    = Fun String        -- function reference ( FP5.5 )
-    | Int Integer       -- Fixed value
+    = Fun String        -- function reference ( -- FP5.5 )
+    | Int Integer       -- Integer value
     deriving (Show, Eq)
 
--- Evaluator for µFP EDSL
+-- Finds and evaluates a function in the program
+-- and produces an integer
 eval :: Prog -> String -> [Integer] -> Integer
 eval rawProg name args = (\(Int x) -> x) result
     where 
@@ -311,17 +336,18 @@ evalFun prog id vals = evalExpr ctx expr
         FunDecl _ args expr = findFun prog id vals
         ctx = Ctx (bindVars args vals) prog
 
+-- Evaluates an expression
 evalExpr :: Context -> Expr -> Val
 evalExpr _ (Fixed x) = Int x
 
 -- Evaluates a variable. if it's not found in LUT, 
--- then we try to pass a global function
+-- then a global function is passed
 evalExpr ctx (Var name) = case var of
     Just val -> val
     Nothing  -> Fun name
     where var = findVar (vars ctx) name
 
--- Evaluates a condition
+-- Evaluates an if/else condition
 evalExpr ctx (Cond pred e1 e2)
     | evalPred ctx pred = evalExpr ctx e1
     | otherwise = evalExpr ctx e2
@@ -330,7 +356,8 @@ evalExpr ctx (Cond pred e1 e2)
 evalExpr ctx (FunCall id args)
     = evalFun (text ctx) name (evalExpr ctx <$> args)
     where 
-        -- Function is either global or a variable
+        -- Function is either global 
+        -- or passed as a variable
         name = case findVar (vars ctx) id of
             Just (Fun name) -> name
             _               -> id
@@ -361,14 +388,14 @@ bindVars [] [] = []
 bindVars ((IntArg _):xs) (_:ys) = bindVars xs ys
 bindVars ((VarArg x):xs) (y:ys) = (x, y) : bindVars xs ys
 
--- Finds a variable value in LUT by its name
+-- Finds a variable value in the loop-up table by its name
 findVar :: LUT -> String -> Maybe Val
 findVar [] _ = Nothing
 findVar ((nx,x):xs) n
     | nx /= n = findVar xs n
     | otherwise = Just x
 
--- Finds a function declaration via pattern matching ( FP5.2 )
+-- Finds a function declaration using pattern matching ( -- FP5.2 )
 findFun :: Prog -> String -> [Val] -> Stmt
 findFun [] id vals = error $ unwords ["No match found:", id]
 findFun (fun@(FunDecl name args expr):funs) id vals
@@ -386,12 +413,12 @@ funMatch args vals
             (Int y) -> x == y
             _       -> False
 
--- Testing functions from "functions.txt"
-prop_eval_fib1 :: Bool
-prop_eval_fib1 = eval prog_fibonacci "fibonacci" [10] == 55
+-- Testing evaluator on functions from "functions.txt"
+prop_eval_fibonacci :: Bool
+prop_eval_fibonacci = eval prog_fibonacci "fibonacci" [10] == 55
 
-prop_eval_fib2 :: Bool
-prop_eval_fib2 = eval prog_fib "fib" [10] == 55
+prop_eval_fib :: Bool
+prop_eval_fib = eval prog_fib "fib" [10] == 55
 
 prop_eval_sum :: NonNegative -> Bool
 prop_eval_sum (NonNeg a) = eval prog_sum  "sum" [a] == test_sum a
@@ -405,8 +432,8 @@ prop_eval_add a b = eval prog_comb "add" [a, b] == a + b
 prop_eval_inc :: Integer -> Bool
 prop_eval_inc a = eval prog_comb "inc" [a] == a + 1
 
-prop_eval_elvn :: Bool
-prop_eval_elvn = eval prog_comb "eleven" [] == 11
+prop_eval_eleven :: Bool
+prop_eval_eleven = eval prog_comb "eleven" [] == 11
 
 test_sum :: Integer -> Integer
 test_sum 0 = 0
@@ -470,27 +497,28 @@ predicateOp =
     <|> More <$ symbol ">" 
     <?> "operation < or > or =="
 
--- Chains expressions like this:
+-- Chains expressions like:
 -- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))
 chain :: Parser a -> Parser (a -> a -> a) -> Parser a
 chain p op = reorder <$> p <*> op <*> chain p op <|> p
   where reorder x f y = f x y
 
 -----------------------------------------------------------------------------
--- FP4.2, FP5.1
+-- FP4.2 -- FP5.1
 -----------------------------------------------------------------------------
 
--- Parsing a textual representation of µFP to EDSL.
+-- Compiles a µFP program
 compile :: String -> Prog
-compile code = compileParser program code
+compile code = compileWith program code
 
-compileParser :: Parser a -> String -> a
-compileParser parser code = fst $ head 
+-- Parses a textual representation of µFP to EDSL
+compileWith :: Parser a -> String -> a
+compileWith parser code = fst $ head 
     $ (\(Result r) -> r) 
     $ parse parser
     $ Stream code initScanner
 
--- Tests for compile
+-- Compilation tests
 prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
 prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
 prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
@@ -501,13 +529,12 @@ prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
 -- FP4.3
 -----------------------------------------------------------------------------
 
--- Reading the specified file, compile it, and evaluate it to 
--- the µFP function. When the file contains multiple functions, 
--- the last function in the file is used.
-
+-- Reads the specified file, compiles and evaluates it.
+-- When the file contains multiple functions, the last one is used
 runFile :: FilePath -> [Integer] -> IO Integer
 runFile path args = evalLast args <$> compile <$> readFile path
 
+-- Evaluates the last function of the program
 evalLast :: [Integer] -> Prog -> Integer
 evalLast args prog = eval prog name args
     where name = (\(FunDecl name _ _) -> name) $ last prog
@@ -516,20 +543,19 @@ evalLast args prog = eval prog name args
 -- FP5.3
 -----------------------------------------------------------------------------
 
--- Function to apply patmatch on each group of function declarations 
--- Constraints: The program can contain multiple with one argument (e.g. prog_sum)
--- however, will fail if the functions are declared in mixed order.
+-- Applies patmatch on each group of function declarations. 
+-- However, it will fail if functions are declared in mixed order
 patmatch :: Prog -> Prog
 patmatch prog = concatMap patmatchFunc (groupFuncs prog)
 
--- Function to group function declarations by their name
+-- Groups function declarations by their name
 groupFuncs :: Prog -> [Prog]
 groupFuncs = groupBy sameFunDecl . sortOn funDeclName
     where
         funDeclName (FunDecl name _ _) = name
         sameFunDecl (FunDecl name1 _ _) (FunDecl name2 _ _) = name1 == name2
 
--- Gets a program and returns a program in if-else form (Cond)
+-- Gets a program and returns a program in if-else form
 patmatchFunc :: Prog -> Prog
 patmatchFunc ((FunDecl name [] expr):fs) 
            = [(FunDecl name [VarArg ""] expr)]
@@ -543,11 +569,12 @@ patmatchFunc ((FunDecl name (x:y:xs) expr):fs)
 patmatchFunc ((FunDecl name ((IntArg x):_) expr):fs) 
            = [(FunDecl name [VarArg var] cond)]
     where
-        cond = Cond pred expr (matchRest fs)
+        cond = Cond pred expr $ matchRest fs
         pred = (Var var, Eq, Fixed x)
         var = varProg fs
 
--- After the initial Stmt is converted the rest will be converted here
+-- After the initial statement is converted 
+-- the rest will be converted here
 matchRest :: [Stmt] -> Expr
 matchRest ((FunDecl _ ((VarArg x):_) expr):_) = expr 
 matchRest ((FunDecl _ ((IntArg x):_) expr):fs) = cond
@@ -555,13 +582,14 @@ matchRest ((FunDecl _ ((IntArg x):_) expr):fs) = cond
         cond = Cond pred expr $ matchRest fs
         pred = (Var $ varProg fs, Eq, Fixed x)
 
--- Finds function call where var is not a digit and returns that letter
+-- Finds a function call where variable is not a digit 
+-- and returns that letter
 varProg :: Prog -> String
 varProg [] = " "
 varProg ((FunDecl _ ((VarArg x):_) _):fs) = x
 varProg ((FunDecl _ ((IntArg _):_) _):fs) = varProg fs
 
--- Tests for fibonacci and sum
+-- Tests for fibonacci and sum with "patmatch"
 prop_eval_patmatch_fib = eval (patmatch prog_fibonacci) "fibonacci" [10] == 55
 prop_eval_patmatch_sum = eval (patmatch prog_sum)  "sum" [8] == 36
 

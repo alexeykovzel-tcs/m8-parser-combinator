@@ -7,88 +7,90 @@ import Control.Applicative
 import Data.Char
 import Test.QuickCheck
 
--- Stream of Chars
-data Stream 
-    = Stream [Char] Scanner
-    deriving (Eq, Show)
-
 -----------------------------------------------------------------------------
 -- FP1.1
 -----------------------------------------------------------------------------
 
+-- Parser accepts a stream of chars and returns the parsed entity
+-- with the remaining chars to be parsed
 data Parser a = P {
-    parse :: Stream -> ErrorHandler Scanner [(a, Stream)]
+    parse :: Stream -> ParseResult a
 }
 
--- Parser has an error handler which returns an output 
--- if everything was parsed correctly, otherwise a Scanner 
--- with row and column were error happened
-data ErrorHandler a b 
-    = ParseError a | Result b 
+-- Stream of chars with a scanner that tracks the position 
+-- of the last parsed character
+data Stream 
+    = Stream [Char] Scanner
+    deriving (Eq, Show)
+
+-- Parser results in either the parse error, indicating the position
+-- of where the error occurred, or the parsed entity
+data ParseResult a
+    = ParseError Scanner
+    | Result [(a, Stream)]
     deriving Show
+
+-- Creates a stream of characters
+stream :: String -> Stream
+stream x = Stream x initScanner
 
 -----------------------------------------------------------------------------
 -- FP5.1
 -----------------------------------------------------------------------------
 
-type Row = Int
-type Column = Int
-
--- Position scanner where parse error occurs
-data Scanner 
-    = Position String Row Column 
-    deriving (Eq, Ord)
-
-instance Show Scanner where
-    show (Position _str row column) 
-        = show row ++ ":" ++ show column
-
--- Initializes a scanner
-initScanner :: Scanner
-initScanner = Position "" 1 1
-
--- Updates a scanner line and column position depends on the char
-updateScanner :: Scanner -> Char -> Scanner
-updateScanner (Position str row column) c
-    | c == '\n' = Position str (row+1) 1
-    | c == '\t' = Position str row (column + 8 - ((column-1) `mod` 8))
-    | otherwise = Position str row (column + 1)
-
--- Error generator
+-- Error generator for parsers
 (<?>) :: Parser a -> String -> Parser a
-p <?> str = P (\(Stream xs s) ->
-    case (parse p (Stream xs s)) of
+p <?> str = P $ \(Stream xs s) ->
+    case (parse p $ Stream xs s) of
         Result r -> Result r
         ParseError s -> error 
             $ "Parse error at " ++ show s 
             ++ ", expected " ++ str
-    )
 
--- Examples:
+-- Scanner tracking the character position
+data Scanner 
+    = Position Int Int
+    deriving (Eq, Ord)
+
+instance Show Scanner where
+    show (Position row column) 
+        = show row ++ ":" ++ show column
+
+-- Initializes a scanner at the beginning
+initScanner :: Scanner
+initScanner = Position 1 1
+
+-- Updates a scanner position based on the parsed character
+updateScanner :: Scanner -> Char -> Scanner
+updateScanner (Position row column) c
+    | c == '\n' = Position (row + 1) 1
+    | c == '\t' = Position row $ column + 8 - ((column - 1) `mod` 8)
+    | otherwise = Position row $ column + 1
+
+-- Examples of usage
 initScannerEx = initScanner
 updateScannerEx = updateScanner initScanner '\n'
-errorGenEx = parse ((char 'a') <?> "'a'") $ Stream "bac" initScanner
+errorGenEx = parse (char 'a' <?> "'a'") $ stream "bac"
 
 -----------------------------------------------------------------------------
 -- FP1.2
 -----------------------------------------------------------------------------
 
--- Applies function to the parsed value
+-- Applies a function to the parsed value
 instance Functor Parser where
-    fmap f (P p) = P (\xs -> 
+    fmap f (P p) = P $ \xs -> 
         case (p xs) of
             Result r -> Result [(f a, ys) | (a, ys) <- r]
             ParseError e -> ParseError e
-        )
 
--- Example:
-fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ Stream "abc" initScanner
+-- Examples of usage
+fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ stream "abc"
 
 -----------------------------------------------------------------------------
 -- FP1.3
 -----------------------------------------------------------------------------
 
--- Parses char if predicate returns true
+-- Parses a char if predicate on it returns true
 charIf :: (Char -> Bool) -> Parser Char
 charIf pred = P p
     where p (Stream [] s) = ParseError s
@@ -100,9 +102,9 @@ charIf pred = P p
 char :: Char -> Parser Char
 char x = charIf (\y -> x == y)
 
--- Examples:
-charIfEx = parse (charIf (\x -> x == 'b')) $ Stream "bbc" initScanner
-charEx = parse (char 'b') $ Stream "bbc" initScanner
+-- Examples of usage
+charEx = parse (char 'b') $ stream "bbc"
+charIfEx = parse (charIf (\x -> x == 'b')) $ stream "bbc"
 
 -----------------------------------------------------------------------------
 -- FP1.4
@@ -112,24 +114,24 @@ charEx = parse (char 'b') $ Stream "bbc" initScanner
 failure :: Parser a
 failure = P (\_ -> ParseError initScanner)
 
--- Example:
-failureEx = parse (failure) $ Stream "abc" initScanner
+-- Examples of usage
+failureEx = parse failure $ stream "abc"
 
 -----------------------------------------------------------------------------
 -- FP1.5
 -----------------------------------------------------------------------------
 
+-- Applies a function within a Parser context
 instance Applicative Parser where
-    pure p = P (\xs -> Result [(p, xs)])
-    p1 <*> p2 = P (\xs -> 
+    pure p = P $ \xs -> Result [(p, xs)]
+    p1 <*> p2 = P $ \xs -> 
         case (parse p1 xs) of
             ParseError e -> ParseError e
             Result [(a, str)] -> parse (a <$> p2) str
-        )
 
--- Examples:
-pureEx = parse (pure 42) $ Stream "123" initScanner
-appEx = parse ((,) <$> char 'a' <*> char 'a') $ Stream "aac" initScanner
+-- Examples of usage
+pureEx = parse (pure 42) $ stream "123"
+appEx = parse ((,) <$> char 'a' <*> char 'a') $ stream "aac"
 
 -----------------------------------------------------------------------------
 -- FP1.6
@@ -137,16 +139,13 @@ appEx = parse ((,) <$> char 'a' <*> char 'a') $ Stream "aac" initScanner
 
 instance Alternative Parser where
     empty = failure
-    some p = (:) <$> p <*> many p
-    many p = some p <|> pure []
-    p1 <|> p2 = P (\xs -> 
+    p1 <|> p2 = P $ \xs -> 
         case (parse p1 xs) of
             ParseError _ -> parse p2 xs
             Result r -> Result r
-        )
 
--- Examples:
-emptyEx = parse (empty) $ Stream "abc" initScanner
-someEx = parse (some (char 'a')) $ Stream "aaabc" initScanner
-manyEx = parse (many (char 'a')) $ Stream "bc" initScanner
-altEx = parse ((char 'a') <|> (char 'b')) $ Stream "bca" initScanner
+-- Examples of usage
+emptyEx = parse empty $ stream "abc"
+someEx = parse (some $ char 'a') $ stream "aaabc"
+manyEx = parse (many $ char 'a') $ stream "bc"
+altEx = parse (char 'a' <|> char 'b') $ stream "bca"

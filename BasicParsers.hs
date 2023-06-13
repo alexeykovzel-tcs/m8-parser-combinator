@@ -29,30 +29,33 @@ upper = charIf isUpper
 dig :: Parser Char
 dig = charIf isDigit
 
--- Examples:
-letterEx = parse (letter) $ Stream "bbc" initScanner
-lowerEx = parse (lower) $ Stream "bbc" initScanner
-upperEx = parse (upper) $ Stream "Bbc" initScanner
-digEx = parse (dig) $ Stream "5ac" initScanner
+-- Examples of usage
+letterEx = parse letter $ stream "bbc"
+lowerEx = parse lower $ stream "bbc"
+upperEx = parse upper $ stream "Bbc"
+digEx = parse dig $ stream "5ac"
 
 -----------------------------------------------------------------------------
 -- FP2.2
 -----------------------------------------------------------------------------
 
-between :: Parser a -> Parser b -> Parser c -> Parser b
-between p1 p2 p3 = p1 *> p2 <* p3
-
+-- Parsers whitespace characters around another parser
 whitespace :: Parser a -> Parser a
 whitespace p = between ws p ws
     where ws = many $ oneOf " \t\n"
 
+-- Parsers a values between other parsers
+between :: Parser a -> Parser b -> Parser c -> Parser b
+between p1 p2 p3 = p1 *> p2 <* p3
+
+-- Parses one of the characters 
 oneOf :: [Char] -> Parser Char
 oneOf xs = charIf (\x -> elem x xs)
 
--- Examples:
-betweenEx = parse (between (char '(') (identifier) (char ')')) $ Stream "(expression)" initScanner
-whitespaceEx = parse (whitespace (identifier)) $ Stream " expression " initScanner
-oneOfEx = parse (oneOf "abc") $ Stream "cde" initScanner
+-- Examples of usage
+whitespaceEx = parse (whitespace dig) $ stream " 1 "
+betweenEx = parse (between (char '(') dig (char ')')) $ stream "(1)"
+oneOfEx = parse (oneOf "abc") $ stream "cde"
 
 -----------------------------------------------------------------------------
 -- FP2.3
@@ -70,10 +73,10 @@ sep p s = sep1 p s <|> pure []
 option :: a -> Parser a -> Parser a
 option x p = p <|> pure x
 
--- Examples:
-sep1Ex = parse (sep (char 'a') (char ',')) $ Stream "a,a,a" initScanner
-sepEx = parse (sep (char 'a') (char ',')) $ Stream "b,b,b" initScanner
-optionEx = parse (option 'x' (char 'a')) $ Stream "xabc" initScanner
+-- Examples of usage
+sep1Ex = parse (sep (char 'a') (char ',')) $ stream "a,a,a"
+sepEx = parse (sep (char 'a') (char ',')) $ stream "b,b,b"
+optionEx = parse (option 'x' (char 'a')) $ stream "xabc"
 
 -----------------------------------------------------------------------------
 -- FP2.4
@@ -103,10 +106,10 @@ parens p = between (char '(') p (char ')')
 braces :: Parser a -> Parser a 
 braces p = between (char '{') p (char '}')
 
--- Examples:
-stringEx = parse (string "There was") $ Stream "There was a guy" initScanner
-identifierEx = parse (identifier) $ Stream "rev0l leksah was his name" initScanner
-integerEx = parse (integer) $ Stream "100 years old he was" initScanner
-symbolEx = parse (symbol "once he looked") $ Stream "once he looked in the mirror" initScanner
-parensEx = parse (parens (string "Wow!")) $ Stream "(Wow!) - he was shocked" initScanner
-bracesEx = parse (braces (string "haskell0ver")) $ Stream "{haskell0ver} he saw in the mirror" initScanner
+-- Examples of usage
+stringEx = parse (string "There was")            $ stream "There was a guy"
+identifierEx = parse identifier                  $ stream "rev0l leksah was his name"
+integerEx = parse integer                        $ stream "100 years old he was"
+symbolEx = parse (symbol "once he looked")       $ stream "once he looked in the mirror"
+parensEx = parse (parens $ string "Wow!")        $ stream "(Wow!) - he was shocked"
+bracesEx = parse (braces $ string "haskell0ver") $ stream "{haskell0ver} he saw in the mirror"
