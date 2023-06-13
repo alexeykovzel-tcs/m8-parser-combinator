@@ -79,7 +79,7 @@ instance QC.Arbitrary Expr where
                     FunCall <$> genName <*> QC.listOf nextExpr
                 ]
                 where 
-                    nextExpr = expr (n `div` 100)
+                    nextExpr = expr (n `div`30)
                     nextPred = (,,) 
                         <$> nextExpr 
                         <*> QC.arbitrary 
@@ -101,8 +101,9 @@ genInteger (Pos n) = n
 prop_expr :: Expr -> Bool
 prop_expr expr = compileWith expression (pretty expr) == expr 
 
+-- We generate arrays of random 
 prop_prog :: QC.Property
-prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) 
+prop_prog = QC.forAll (QC.resize 5 QC.arbitrary) 
     $ \(NonEmptyList prog) -> compile (pretty prog) == prog
 
 -----------------------------------------------------------------------------
