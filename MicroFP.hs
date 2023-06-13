@@ -96,7 +96,10 @@ genIdentifier = QC.vectorOf 3 $ QC.elements "abcde"
 genInteger :: Positive -> Integer
 genInteger (Pos n) = n
 
--- Tests that a generated program can be compiled
+-- Generator tests
+prop_expr :: Expr -> Bool
+prop_expr expr = compileWith expression (pretty expr) == expr 
+
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) 
     $ \(NonEmptyList prog) -> compile (pretty prog) == prog
@@ -458,7 +461,7 @@ argument =  (IntArg <$> integer)
         <|> (VarArg <$> identifier)
 
 expression :: Parser Expr
-expression = (whitespace $ term `chain` op) <?> "'expression'"
+expression = (whitespace $ term `chain` op)
     where op = (Add <$ symbol "+")
            <|> (Sub <$ symbol "-")
 
