@@ -8,7 +8,7 @@ import Data.Char
 import Test.QuickCheck
 
 -----------------------------------------------------------------------------
--- FP1.1
+-- FP1.1 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parser accepts a stream of chars and returns the parsed entity
@@ -35,7 +35,7 @@ stream :: String -> Stream
 stream x = Stream x initScanner
 
 -----------------------------------------------------------------------------
--- FP5.1
+-- FP5.1 (Author: Denis)
 -----------------------------------------------------------------------------
 
 -- Error generator for parsers
@@ -73,7 +73,7 @@ updateScannerEx = updateScanner initScanner '\n'
 errorGenEx = parse (char 'a' <?> "'a'") $ stream "bac"
 
 -----------------------------------------------------------------------------
--- FP1.2
+-- FP1.2 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Applies a function to the parsed value
@@ -87,7 +87,7 @@ instance Functor Parser where
 fmapEx = parse ((,) <$> (char 'a') <*> (char 'b')) $ stream "abc"
 
 -----------------------------------------------------------------------------
--- FP1.3
+-- FP1.3 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a char if predicate on it returns true
@@ -107,7 +107,7 @@ charEx = parse (char 'b') $ stream "bbc"
 charIfEx = parse (charIf (\x -> x == 'b')) $ stream "bbc"
 
 -----------------------------------------------------------------------------
--- FP1.4
+-- FP1.4 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parser that always fails
@@ -118,7 +118,7 @@ failure = P (\_ -> ParseError initScanner)
 failureEx = parse failure $ stream "abc"
 
 -----------------------------------------------------------------------------
--- FP1.5
+-- FP1.5 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Applies a function within a Parser context
@@ -134,7 +134,7 @@ pureEx = parse (pure 42) $ stream "123"
 appEx = parse ((,) <$> char 'a' <*> char 'a') $ stream "aac"
 
 -----------------------------------------------------------------------------
--- FP1.6
+-- FP1.6 (Authors: Denis & Aliaksei)
 -----------------------------------------------------------------------------
 
 instance Alternative Parser where

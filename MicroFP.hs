@@ -19,7 +19,7 @@ import Data.List
 -- In order to run all QuickCheck tests, use "check" function
 
 -----------------------------------------------------------------------------
--- FP5.6
+-- FP5.6 (Author: Serkan)
 -----------------------------------------------------------------------------
 
 -- The following code generates random programs as well as 
@@ -107,7 +107,7 @@ prop_prog = QC.forAll (QC.resize 5 QC.arbitrary)
     $ \(NonEmptyList prog) -> compile (pretty prog) == prog
 
 -----------------------------------------------------------------------------
--- FP3.1
+-- FP3.1 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- A set of type/data constructors that represent 
@@ -141,7 +141,7 @@ data PredOp
     deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
--- FP3.2
+-- FP3.2 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- The following functions in µFP EDSL correspond 
@@ -200,7 +200,7 @@ prog_comb = [
     FunDecl "eleven" [] (FunCall "inc" [Fixed 10]) ]
 
 -----------------------------------------------------------------------------
--- FP3.3
+-- FP3.3 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Pretty printer that generates a textual representation 
@@ -256,7 +256,7 @@ prettyJoin :: Pretty a => a -> String -> a -> String
 prettyJoin s1 sep s2 = pretty s1 ++ sep ++ pretty s2
 
 -----------------------------------------------------------------------------
--- FP5.4 (partial application)
+-- FP5.4 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Partial application is implemented by preprocessing the program
@@ -308,7 +308,7 @@ arity ((FunDecl name args _):xs) id
     | otherwise  = arity xs id
 
 -----------------------------------------------------------------------------
--- FP3.4 -- FP5.2 -- FP5.5
+-- FP3.4 ; FP5.2 ; FP5.5 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Evaluator for µFP EDSL with support for pattern matching
@@ -445,7 +445,7 @@ test_sum 0 = 0
 test_sum n = n + (test_sum $ n - 1)
 
 -----------------------------------------------------------------------------
--- FP4.1
+-- FP4.1 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 program :: Parser Prog
@@ -509,7 +509,7 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
   where reorder x f y = f x y
 
 -----------------------------------------------------------------------------
--- FP4.2 -- FP5.1
+-- FP4.2 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Compiles a µFP program
@@ -531,7 +531,7 @@ prop_compile_div  = prog_div  == (compile $ pretty prog_div)
 prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
 
 -----------------------------------------------------------------------------
--- FP4.3
+-- FP4.3 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Reads the specified file, compiles and evaluates it.
@@ -545,7 +545,7 @@ evalLast args prog = eval prog name args
     where name = (\(FunDecl name _ _) -> name) $ last prog
 
 -----------------------------------------------------------------------------
--- FP5.3
+-- FP5.3 (Author: Serkan)
 -----------------------------------------------------------------------------
 
 -- Applies patmatch on each group of function declarations. 

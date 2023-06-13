@@ -10,7 +10,7 @@ import Test.QuickCheck
 import PComb
 
 -----------------------------------------------------------------------------
--- FP2.1
+-- FP2.1 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a letter
@@ -36,7 +36,7 @@ upperEx = parse upper $ stream "Bbc"
 digEx = parse dig $ stream "5ac"
 
 -----------------------------------------------------------------------------
--- FP2.2
+-- FP2.2 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parsers whitespace characters around another parser
@@ -58,7 +58,7 @@ betweenEx = parse (between (char '(') dig (char ')')) $ stream "(1)"
 oneOfEx = parse (oneOf "abc") $ stream "cde"
 
 -----------------------------------------------------------------------------
--- FP2.3
+-- FP2.3 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses one or more occurrences of p, separated by s
@@ -79,7 +79,7 @@ sepEx = parse (sep (char 'a') (char ',')) $ stream "b,b,b"
 optionEx = parse (option 'x' (char 'a')) $ stream "xabc"
 
 -----------------------------------------------------------------------------
--- FP2.4
+-- FP2.4 (Author: Aliaksei)
 -----------------------------------------------------------------------------
 
 -- Parses a given string, similar to the function char
