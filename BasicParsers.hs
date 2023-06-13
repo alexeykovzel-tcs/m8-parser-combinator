@@ -17,21 +17,25 @@ import PComb
 letter :: Parser Char
 letter = charIf isLetter
 
+letterEx = parse (letter) $ Stream "bbc" initScanner
+
 -- Parses a lowercase letter
 lower :: Parser Char
 lower = charIf isLower
+
+lowerEx = parse (lower) $ Stream "bbc" initScanner
 
 -- Parses an uppercase letter
 upper :: Parser Char
 upper = charIf isUpper
 
+upperEx = parse (upper) $ Stream "Bbc" initScanner
+
 -- Parses a digit
 dig :: Parser Char
 dig = charIf isDigit
 
--- Examples:
-ex_letter   = parse letter $ Stream "abc"
-ex_dig      = parse dig $ Stream "123"
+digEx = parse (dig) $ Stream "5ac" initScanner
 
 -----------------------------------------------------------------------------
 -- FP2.2
@@ -40,17 +44,18 @@ ex_dig      = parse dig $ Stream "123"
 between :: Parser a -> Parser b -> Parser c -> Parser b
 between p1 p2 p3 = p1 *> p2 <* p3
 
+betweenEx = parse (between (char '(') (identifier) (char ')')) $ Stream "(expression)" initScanner
+
 whitespace :: Parser a -> Parser a
 whitespace p = between ws p ws
     where ws = many $ oneOf " \t\n"
 
+whitespaceEx = parse (whitespace (identifier)) $ Stream " expression " initScanner
+
 oneOf :: [Char] -> Parser Char
 oneOf xs = charIf (\x -> elem x xs)
 
--- Examples:
-ex_between      = parse (between (char '(') (char 'a') (char ')')) $ Stream "(a)b"
-ex_whitespace   = parse (whitespace $ string "a") $ Stream "\n a \n "
-ex_oneOf        = parse (oneOf "abc") $ Stream "banana"
+oneOfEx = parse (oneOf "abc") $ Stream "cde" initScanner
 
 -----------------------------------------------------------------------------
 -- FP2.3
@@ -60,20 +65,19 @@ ex_oneOf        = parse (oneOf "abc") $ Stream "banana"
 sep1 :: Parser a -> Parser b -> Parser [a]
 sep1 p s = (:) <$> p <*> (s *> sep1 p s <|> pure [])
 
+sep1Ex = parse (sep (char 'a') (char ',')) $ Stream "a,a,a" initScanner
+
 -- Works as sep1 p s, but parses zero or more occurrences of p
 sep :: Parser a -> Parser b -> Parser [a]
 sep p s = sep1 p s <|> pure []
+
+sepEx = parse (sep (char 'a') (char ',')) $ Stream "b,b,b" initScanner
 
 -- Tries to apply parser p; upon failure it results in x
 option :: a -> Parser a -> Parser a
 option x p = p <|> pure x
 
--- Examples:
-ex_sep1         = parse (sep1 (char 'a') (char ',')) $ Stream "a,a,a ccc"
-ex_sep1_fail    = parse (sep1 (char 'a') (char ',')) $ Stream "ccc"
-ex_sep          = parse (sep (char 'a') (char ',')) $ Stream "ccc"
-ex_option_fail  = parse (option 'b' (char 'a')) $ Stream "cba"
-ex_option       = parse (option 'b' (char 'a')) $ Stream "abc"
+optionEx = parse (option 'x' (char 'a')) $ Stream "xabc" initScanner
 
 -----------------------------------------------------------------------------
 -- FP2.4
@@ -83,30 +87,34 @@ ex_option       = parse (option 'b' (char 'a')) $ Stream "abc"
 string :: String -> Parser String
 string xs = foldr (\a b -> (:) <$> a <*> b) (pure "") (char <$> xs)
 
+stringEx = parse (string "There was") $ Stream "There was a guy" initScanner
+
 -- Parses an identifier surrounded by whitespace
 identifier :: Parser String 
 identifier = whitespace $ (:) <$> lower <*> (many $ lower <|> dig)
+
+identifierEx = parse (identifier) $ Stream "rev0l leksah was his name" initScanner
 
 -- Parses an integer surrounded by whitespace
 integer :: Parser Integer
 integer = whitespace $ read <$> some dig
 
+integerEx = parse (integer) $ Stream "100 years old he was" initScanner
+
 -- Parses a given string surrounded by whitespaces
 symbol :: String -> Parser String
 symbol xs = whitespace $ string xs
+
+symbolEx = parse (symbol "once he looked") $ Stream "once he looked in the mirror" initScanner
 
 -- Parses something using the provided parser between parentheses
 parens :: Parser a -> Parser a 
 parens p = between (char '(') p (char ')')
 
+parensEx = parse (parens (string "Wow!")) $ Stream "(Wow!) - he was shocked" initScanner
+
 -- Parses something using the provided parser between braces
 braces :: Parser a -> Parser a 
 braces p = between (char '{') p (char '}')
 
--- Examples:
-ex_string       = parse (string "abc") $ Stream "abc"
-ex_identifier   = parse identifier $ Stream "a123"
-ex_integer      = parse integer $ Stream "123"
-ex_symbol       = parse (symbol "abc") $ Stream "\n abc \n"
-ex_parens       = parse (parens $ char 'a') $ Stream "(a)"
-ex_braces       = parse (braces $ char 'a') $ Stream "{a}"
+bracesEx = parse (braces (string "haskell0ver")) $ Stream "{haskell0ver} he saw in the mirror" initScanner

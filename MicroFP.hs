@@ -190,7 +190,9 @@ instance Pretty Prog where
 instance Pretty Stmt where
     pretty (FunDecl id args expr)
         = unwords [id, prettyArgs, ":=", pretty expr, ";"]
-        where prettyArgs = unwords $ map pretty args
+        where prettyArgs
+                | length args == 0 = ""
+                | otherwise = unwords $ map pretty args
 
 instance Pretty Arg where
     pretty (IntArg x) = show x
@@ -210,7 +212,9 @@ instance Pretty Expr where
 
     pretty (FunCall id args) 
         = id ++ " (" ++ prettyArgs ++ ")"
-        where prettyArgs = join ", " $ map pretty args
+        where prettyArgs
+                | length args == 0 = ""
+                | otherwise = join ", " $ map pretty args
 
 instance Pretty Pred where
     pretty (e1, op, e2) = prettyJoin e1 (pretty op) e2
@@ -409,27 +413,27 @@ test_sum n = n + (test_sum $ n - 1)
 -----------------------------------------------------------------------------
 
 program :: Parser Prog
-program = some statement
+program = some statement <?> "'function declaration'"
 
 statement :: Parser Stmt
 statement = FunDecl
     <$> identifier
     <*> many argument
-    <*  symbol ":=" <*> expression
-    <*  char ';'
+    <*  (symbol ":=" <?> "':='") <*> expression
+    <*  (char ';' <?> ";")
 
 argument :: Parser Arg
-argument =  IntArg <$> integer 
-        <|> VarArg <$> identifier
+argument =  (IntArg <$> integer)
+        <|> (VarArg <$> identifier)
 
 expression :: Parser Expr
-expression = whitespace $ term `chain` op
+expression = (whitespace $ term `chain` op) <?> "'expression'"
     where op = (Add <$ symbol "+")
            <|> (Sub <$ symbol "-")
 
 term :: Parser Expr
 term = factor `chain` op
-    where op = Mult <$ symbol "*"
+    where op = (Mult <$ symbol "*")
 
 factor :: Parser Expr
 factor = condition
@@ -445,8 +449,8 @@ funCall = FunCall
 
 condition :: Parser Expr
 condition = Cond
-    <$ symbol "if"   <*> parens predicate
-    <* symbol "then" <*> braces expression 
+    <$ symbol "if" <*> parens predicate
+    <* symbol "then" <*> braces expression
     <* symbol "else" <*> braces expression
 
 predicate :: Parser Pred
@@ -459,7 +463,8 @@ predicateOp :: Parser PredOp
 predicateOp = 
         Less <$ symbol "<"
     <|> More <$ symbol ">"
-    <|> Less <$ symbol "=="
+    <|> Eq <$ symbol "=="
+    <?> "operation < or > or =="
 
 -- Chains expressions like this:
 -- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))
@@ -468,15 +473,20 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
   where reorder x f y = f x y
 
 -----------------------------------------------------------------------------
--- FP4.2
+-- FP4.2, FP5.1
 -----------------------------------------------------------------------------
 
 -- Parsing a textual representation of µFP to EDSL.
-
 compile :: String -> Prog
-compile code = fst $ head $ parse program $ Stream code
+compile code = compileParser program code
 
--- Testing
+compileParser :: Parser a -> String -> a
+compileParser parser code = fst $ head 
+    $ (\(Result r) -> r) 
+    $ parse parser
+    $ Stream code initScanner
+
+-- Tests for compile
 prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
 prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
 prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
@@ -502,11 +512,9 @@ evalLast args prog = eval prog name args
 -- FP5.3
 -----------------------------------------------------------------------------
 
-{- 
-    Function to apply patmatch on each group of function declarations 
-    Constraints: The program can contain multiple with one argument(like prog_sum and prog_fibonacci)
-    however, will fail if the functions are declared in mixed order.
--}
+-- Function to apply patmatch on each group of function declarations 
+-- Constraints: The program can contain multiple with one argument (e.g. prog_sum)
+-- however, will fail if the functions are declared in mixed order.
 patmatch :: Prog -> Prog
 patmatch prog = concatMap patmatchFunc (groupFuncs prog)
 
@@ -520,13 +528,16 @@ groupFuncs = groupBy sameFunDecl . sortOn funDeclName
 -- Gets a program and returns a program in if-else form (Cond)
 patmatchFunc :: Prog -> Prog
 patmatchFunc ((FunDecl name [] expr):fs) 
-       = [(FunDecl name [VarArg $ ""] expr)]
+           = [(FunDecl name [VarArg ""] expr)]
+
 patmatchFunc ((FunDecl name [(VarArg x)] expr):fs) 
-       = [(FunDecl name [VarArg $ x] expr)]
+           = [(FunDecl name [VarArg x] expr)]
+
 patmatchFunc ((FunDecl name (x:y:xs) expr):fs) 
-       = [(FunDecl name (x:y:xs) expr)]
+           = [(FunDecl name (x:y:xs) expr)]
+
 patmatchFunc ((FunDecl name ((IntArg x):_) expr):fs) 
-       = [(FunDecl name [VarArg var] cond)]
+           = [(FunDecl name [VarArg var] cond)]
     where
         cond = Cond pred expr (matchRest fs)
         pred = (Var var, Eq, Fixed x)
