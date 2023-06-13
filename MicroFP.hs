@@ -16,12 +16,11 @@ import qualified Test.QuickCheck as QC
 import Data.Char
 import Data.List
 
+-- In order to run all QuickCheck tests, use "check" function
+
 -----------------------------------------------------------------------------
 -- FP5.6
 -----------------------------------------------------------------------------
-
--- The following declarations are used to define the EDSL as an instance of Arbitrary.
--- Two QuickCheck test are defined. They are ran once you run the "check command".
 
 -- The following code generates random programs as well as 
 -- contains QuickCheck helpers used throughout the file
@@ -102,7 +101,6 @@ genInteger (Pos n) = n
 prop_expr :: Expr -> Bool
 prop_expr expr = compileWith expression (pretty expr) == expr 
 
--- Test for programs
 prop_prog :: QC.Property
 prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) 
     $ \(NonEmptyList prog) -> compile (pretty prog) == prog
