@@ -15,6 +15,7 @@ import Test.QuickCheck.All
 import qualified Test.QuickCheck as QC
 import Data.Char
 import Data.List
+import Debug.Trace
 
 -----------------------------------------------------------------------------
 -- QuickCheck data types
@@ -30,7 +31,65 @@ instance QC.Arbitrary NonNegative where
 
 -- Generates positive integers
 instance QC.Arbitrary Positive where
-    arbitrary = Pos <$> (QC.getPositive <$> QC.arbitrary)
+    arbitrary = Pos <$> (QC.getPositive <$> QC.arbitrary) 
+
+
+instance QC.Arbitrary Stmt where
+    arbitrary = FunDecl <$> name <*> args <*> expr
+        where
+            name = gen_name
+            args = QC.arbitrary
+            expr = QC.arbitrary
+
+instance QC.Arbitrary Arg where
+    arbitrary = QC.oneof [VarArg <$> gen_identifier, IntArg . gen_integer <$> QC.arbitrary]
+
+instance QC.Arbitrary Expr where
+    arbitrary = QC.sized expr 
+        where 
+            expr 0 = QC.oneof [Fixed . gen_integer <$> QC.arbitrary, Var <$> gen_identifier]
+            expr n = QC.oneof [
+                Add <$> next_expr <*> next_expr,
+                Sub <$> next_expr <*> next_expr,
+                Mult <$> next_expr <*> next_expr,
+                Fixed . gen_integer <$> QC.arbitrary,
+                Var <$> gen_identifier,
+                Cond <$> next_Pred <*> next_expr <*> next_expr,
+                FunCall <$> gen_name <*> QC.listOf next_expr]
+                where 
+                    next_expr = expr (n `div` 2)
+                    next_Pred = (,,) <$> next_expr <*> QC.arbitrary <*> next_expr
+
+instance QC.Arbitrary PredOp where
+    arbitrary = QC.oneof [
+        pure Less,
+        pure Eq,
+        pure More]
+
+gen_name :: QC.Gen String
+gen_name = QC.vectorOf 3 $ QC.elements "fghk"
+
+gen_identifier :: QC.Gen String
+gen_identifier = QC.vectorOf 3 $ QC.elements "abcde"
+
+gen_integer :: Positive -> Integer
+gen_integer (Pos n) = n
+
+-- prop_expr :: Expr -> Bool
+-- prop_expr expr = compile (pretty expr) == expr 
+
+prop_prog :: QC.Property
+prop_prog = QC.forAll (QC.resize 3 QC.arbitrary) prog
+
+prog :: NonEmptyList Stmt -> Bool
+prog (NonEmptyList prog) = compile (pretty prog) == prog
+
+
+newtype NonEmptyList a = NonEmptyList [a]
+    deriving (Show)
+
+instance QC.Arbitrary a => QC.Arbitrary (NonEmptyList a) where
+    arbitrary = NonEmptyList <$> (QC.listOf1 QC.arbitrary)
 
 -----------------------------------------------------------------------------
 -- FP3.1
@@ -140,9 +199,9 @@ instance Pretty Arg where
 instance Pretty Expr where
     pretty (Fixed  x) = show x
     pretty (Var    x) = x
-    pretty (Add  x y) = prettyJoin x " + " y 
-    pretty (Sub  x y) = prettyJoin x " - " y 
-    pretty (Mult x y) = prettyJoin x " * " y 
+    pretty (Add  x y) = "(" ++ prettyJoin x " + " y ++ ")"  -- added parantheses
+    pretty (Sub  x y) = "(" ++ prettyJoin x " - " y ++ ")" 
+    pretty (Mult x y) = "(" ++ prettyJoin x " * " y ++ ")" 
 
     pretty (Cond pred e1 e2) 
         = "if (" ++ pretty pred ++ ")"
@@ -330,8 +389,7 @@ prop_eval_sum :: NonNegative -> Bool
 prop_eval_sum (NonNeg a) = eval prog_sum  "sum" [a] == test_sum a
 
 prop_eval_div :: Positive -> Positive -> Bool
-prop_eval_div (Pos a) (Pos b) = (a <= 0 || b <= 0) ||
-    eval prog_div  "div" [a, b] == a `div` b
+prop_eval_div (Pos a) (Pos b) = eval prog_div  "div" [a, b] == a `div` b
 
 prop_eval_add :: Integer -> Integer -> Bool
 prop_eval_add a b = eval prog_comb "add" [a, b] == a + b
