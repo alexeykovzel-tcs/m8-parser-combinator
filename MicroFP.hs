@@ -79,7 +79,7 @@ instance QC.Arbitrary Expr where
                     FunCall <$> genName <*> QC.listOf nextExpr
                 ]
                 where 
-                    nextExpr = expr (n `div`30)
+                    nextExpr = expr (n `div`80)
                     nextPred = (,,) 
                         <$> nextExpr 
                         <*> QC.arbitrary 
