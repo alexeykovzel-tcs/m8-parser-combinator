@@ -316,27 +316,27 @@ prop_eval_elvn = eval prog_comb "eleven" [] == 11
 -----------------------------------------------------------------------------
 
 program :: Parser Prog
-program = some statement
+program = some statement <?> "'function declaration'"
 
 statement :: Parser Stmt
 statement = FunDecl
     <$> identifier
     <*> many argument
-    <*  symbol ":=" <*> expression
-    <*  char ';'
+    <*  (symbol ":=" <?> "':='") <*> expression
+    <*  (char ';' <?> ";")
 
 argument :: Parser Arg
-argument =  IntArg <$> integer 
-        <|> VarArg <$> identifier
+argument =  (IntArg <$> integer)
+        <|> (VarArg <$> identifier)
 
 expression :: Parser Expr
-expression = whitespace $ term `chain` op
+expression = (whitespace $ term `chain` op) <?> "'expression'"
     where op = (Add <$ symbol "+")
            <|> (Sub <$ symbol "-")
 
 term :: Parser Expr
 term = factor `chain` op
-    where op = Mult <$ symbol "*"
+    where op = (Mult <$ symbol "*")
 
 factor :: Parser Expr
 factor = condition
@@ -352,8 +352,8 @@ funCall = FunCall
 
 condition :: Parser Expr
 condition = Cond
-    <$ symbol "if"   <*> parens predicate
-    <* symbol "then" <*> braces expression 
+    <$ symbol "if" <*> parens predicate
+    <* symbol "then" <*> braces expression
     <* symbol "else" <*> braces expression
 
 predicate :: Parser Pred
@@ -366,7 +366,8 @@ predicateOp :: Parser PredOp
 predicateOp = 
         Less <$ symbol "<"
     <|> More <$ symbol ">"
-    <|> Less <$ symbol "=="
+    <|> Eq <$ symbol "=="
+    <?> "operation < or > or =="
 
 -- Chains expressions like this:
 -- 2 + 2 + 2  => Add 2 (Add 2 (Add 2))
@@ -375,20 +376,22 @@ chain p op = reorder <$> p <*> op <*> chain p op <|> p
   where reorder x f y = f x y
 
 -----------------------------------------------------------------------------
--- FP4.2
+-- FP4.2, FP5.1
 -----------------------------------------------------------------------------
 
 -- Parsing a textual representation of µFP to EDSL.
-
 compile :: String -> Prog
-compile code = fst $ head $ parse program $ Stream code
+compile code = fst $ head $ (\(Result r) -> r) $ parse program $ Stream code initScanner
 
--- Testing
+-- Tests for compile
 prop_compile_fibonacci = prog_fibonacci == (compile $ pretty prog_fibonacci)
 prop_compile_fib  = prog_fib  == (compile $ pretty prog_fib)
 prop_compile_sum  = prog_sum  == (compile $ pretty prog_sum)
 prop_compile_div  = prog_div  == (compile $ pretty prog_div)
 prop_compile_comb = prog_comb == (compile $ pretty prog_comb)
+
+-- Tests for error handling
+-- TODO:
 
 -----------------------------------------------------------------------------
 -- FP4.3
